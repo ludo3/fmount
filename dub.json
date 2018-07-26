@@ -1,0 +1,9 @@
+{
+	"name": "fmount",
+	"authors": [
+		"Ludovic Dordet"
+	],
+	"description": "Mount hotpluggable/removable storages.",
+	"copyright": "Copyright © 2018, Ludovic Dordet",
+	"license": "GNU General Public License v3 (GPLv3)"
+}
