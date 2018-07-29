@@ -14,6 +14,14 @@
 			"versions": ["FMountApp"],
       "mainSourceFile": "src/fmount_app.d",
       "excludedSourceFiles": [ "src/fumount_app.d" ]
+		},
+		{
+			"name": "fumount-app",
+			"targetType": "executable",
+			"platforms": ["linux"],
+			"versions": ["FUmountApp"],
+      "mainSourceFile": "src/fumount_app.d",
+      "excludedSourceFiles": [ "src/fmount_app.d" ]
 		}
   ]
 }
