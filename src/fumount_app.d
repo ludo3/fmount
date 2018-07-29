@@ -30,27 +30,33 @@ import run;
  */
 void main(string[] args)
 {
-    auto parsed_args = getopt(
-        args,
-        std.getopt.config.bundling,
-
-        "exec-dir|D",  exec_dir_help,  &execDirHandler,
-
-        "quiet|q",   quiet_help, &verboseHandler,
-        "verbose|v", verbose_help, &verboseHandler,
-        "fake|F",    fake_help, &fake);
-
-    if (parsed_args.helpWanted)
+    try
     {
+        auto parsed_args = getopt(
+            args,
+            std.getopt.config.bundling,
 
-      // FIXME improve getopt formatting.
-      defaultGetoptPrinter("Unmount a removable device, or any device if enabled"
-                           ~" by the system administrator.",
-                           parsed_args.options);
-    }
-    else {
-        run_parsed(&fumount, args);
-    }
+            "exec-dir|D",  exec_dir_help,  &execDirHandler,
 
+            "quiet|q",   quiet_help, &verboseHandler,
+            "verbose|v", verbose_help, &verboseHandler,
+            "fake|F",    fake_help, &fake);
+
+        if (parsed_args.helpWanted)
+        {
+
+            // FIXME improve getopt formatting.
+            defaultGetoptPrinter("Unmount a removable device, or any device if "
+                                ~"authorized by the system administrator.",
+                                parsed_args.options);
+        }
+        else {
+            run_parsed(&fumount, args);
+        }
+    }
+    catch(GetOptException goe)
+    {
+        writeln(goe.msg);
+    }
 }
 

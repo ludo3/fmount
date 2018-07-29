@@ -18,6 +18,25 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module run;
 import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
+import std.getopt : GetOptException, GetoptResult, getopt;
+import std.stdio : writeln;
+
+/**
+ * Call `std.getopt.getopt(args, ...)` and print any option-related exception.
+ */
+GetoptResult check_opts(T...)(ref string[] args, T opts)
+{
+    try
+    {
+        return getopt(args, opts);
+    }
+    catch(GetOptException goe)
+    {
+        writeln(goe.msg);
+        throw goe;
+    }
+}
+
 
 alias main_fun = void delegate(string[]);
 

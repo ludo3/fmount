@@ -21,7 +21,7 @@ import std.stdio;
 
 import argsutil;
 import mnt.mount : fmount;
-import run;
+import run : run_parsed;
 
 /**
  * The `fmount` program entry point.
@@ -30,33 +30,39 @@ import run;
  */
 void main(string[] args)
 {
-    auto parsed_args = getopt(
-        args,
-        std.getopt.config.bundling,
-
-        "passfile|p",   passphrase_help, &passphrase_file,
-
-        "use-norandom", norandom_help, &randfileHandler,
-        "use-random",   random_help,   &randfileHandler,
-        "use-urandom",  urandom_help,  &randfileHandler,
-
-        "exec-dir|D",  exec_dir_help,  &execDirHandler,
-        "option|o",  option_help,  &optionHandler,
-
-        "quiet|q",   quiet_help, &verboseHandler,
-        "verbose|v", verbose_help, &verboseHandler,
-        "fake|F",    fake_help, &fake);
-
-    if (parsed_args.helpWanted)
+    try
     {
-      // FIXME improve getopt formatting.
-      defaultGetoptPrinter("Mount a removable device, or any device if enabled"
-                           ~" by the system administrator.",
-                           parsed_args.options);
-    }
-    else {
-        run_parsed(&fmount, args);
-    }
+        auto parsed_args = getopt(
+            args,
+            std.getopt.config.bundling,
 
+            "passfile|p",   passphrase_help, &passphrase_file,
+
+            "use-norandom", norandom_help, &randfileHandler,
+            "use-random",   random_help,   &randfileHandler,
+            "use-urandom",  urandom_help,  &randfileHandler,
+
+            "exec-dir|D",  exec_dir_help,  &execDirHandler,
+            "option|o",  option_help,  &optionHandler,
+
+            "quiet|q",   quiet_help, &verboseHandler,
+            "verbose|v", verbose_help, &verboseHandler,
+            "fake|F",    fake_help, &fake);
+
+        if (parsed_args.helpWanted)
+        {
+            // FIXME improve getopt formatting.
+            defaultGetoptPrinter("Mount a removable device, or any device if "
+                                   ~"authorized by the system administrator.",
+                                   parsed_args.options);
+        }
+        else {
+            run_parsed(&fmount, args);
+        }
+    }
+    catch(GetOptException goe)
+    {
+        writeln(goe.msg);
+    }
 }
 
