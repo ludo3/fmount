@@ -6,4 +6,14 @@
 	"description": "Mount hotpluggable/removable storages.",
 	"copyright": "Copyright © 2018, Ludovic Dordet",
 	"license": "GPL-3.0",
+  "configurations": [
+		{
+			"name": "fmount-app",
+			"targetType": "executable",
+			"platforms": ["linux"],
+			"versions": ["FMountApp"],
+      "mainSourceFile": "src/fmount_app.d",
+      "excludedSourceFiles": [ "src/fumount_app.d" ]
+		}
+  ]
 }
