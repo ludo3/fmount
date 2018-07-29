@@ -215,7 +215,7 @@ immutable static auto _usual_exec_dirs = [
 auto exec_dir_help = join([
     "Use the specified execution directory. The option must be used for each",
     "directory to be used. The default execution directories are:\n",
-    format!"                %s."(join(_usual_exec_dirs, "\n                ")),
+    format!"               %s."(join(_usual_exec_dirs, "\n                ")),
     ], " ");
 
 /**
