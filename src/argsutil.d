@@ -27,6 +27,8 @@ import std.getopt : Option;
 import std.stdio;
 import std.string;
 
+public import constvals : VbLevel;
+
 
 /**
  * Get the --key-file and --keyfile-size arguments for cryptsetup.
@@ -61,8 +63,7 @@ auto passphrase_help = outdent(join([
 string passphrase_file;
 
 
-/// Private immutable value.
-immutable static string dev = "/dev/";
+private immutable static string dev = "/dev/";
 
 /// The known random source files.
 enum RandFile : string {
@@ -114,7 +115,6 @@ void randfileHandler(string option)
     }
 }
 
-/// Private immutable value.
 immutable static string random_fmt = "Use %s as entropy source.";
 
 /// help for use-random option
@@ -127,27 +127,7 @@ auto urandom_help = format!random_fmt(RandFile.Urandom);
 auto norandom_help = "Do not use any entropy source (use with care).";
 
 
-/// verbose type
-enum VbLevel
-{
-    /// Print errors.
-    None,
-
-    /// Print errors and warnings.
-    Warn,
-
-    /// Print errors, warnings and informations.
-    Info,
-
-    /// Print more informations in order to check small issues.
-    More,
-
-    /// Print as much informations as possible, for debugging purpose.
-    Dbug
-}
-
-/// Private value.
-immutable static VbLevel dflt_verbose = VbLevel.Warn;
+private immutable static VbLevel dflt_verbose = VbLevel.Warn;
 
 /// Tell what is done.
 VbLevel verbose = dflt_verbose;
@@ -173,8 +153,7 @@ void verboseHandler(string option)
 /// help for quiet option
 auto quiet_help = "Be quiet : disable verbosity.";
 
-/// private format
-immutable static string verbose_fmt =
+private immutable static string verbose_fmt =
     "Print what is done. This can be used several times. Default: %s.";
 
 /// help for verbose option
@@ -201,8 +180,7 @@ void print_args(string[] args)
 }
 
 
-/// Private immutable value.
-immutable static auto _usual_exec_dirs = [
+private immutable static auto _usual_exec_dirs = [
         "/usr/local/sbin",
         "/usr/local/bin",
         "/usr/sbin",
@@ -211,7 +189,7 @@ immutable static auto _usual_exec_dirs = [
         "/bin",
         ];
 
-/// Private immutable value.
+/// The `--exec-dir` description.
 auto exec_dir_help = join([
     "Use the specified execution directory. The option must be used for each",
     "directory to be used. The default execution directories are:\n",
@@ -237,7 +215,7 @@ string[] exec_dirs = [];
  *                 `-D`, `--exec-dir`.
  *     value  =    the option value.
  */
- void execDirHandler(string option, string value)
+void execDirHandler(string option, string value)
 {
     exec_dirs ~= [ value ];
 }
