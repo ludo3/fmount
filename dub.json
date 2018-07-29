@@ -1,27 +1,42 @@
 {
-	"name": "fmount",
-	"authors": [
-		"Ludovic Dordet"
-	],
-	"description": "Mount hotpluggable/removable storages.",
-	"copyright": "Copyright © 2018, Ludovic Dordet",
-	"license": "GPL-3.0",
-  "configurations": [
-		{
-			"name": "fmount-app",
-			"targetType": "executable",
-			"platforms": ["linux"],
-			"versions": ["FMountApp"],
-      "mainSourceFile": "src/fmount_app.d",
-      "excludedSourceFiles": [ "src/fumount_app.d" ]
-		},
-		{
-			"name": "fumount-app",
-			"targetType": "executable",
-			"platforms": ["linux"],
-			"versions": ["FUmountApp"],
-      "mainSourceFile": "src/fumount_app.d",
-      "excludedSourceFiles": [ "src/fmount_app.d" ]
-		}
-  ]
+  "name" : "fmount",
+  "authors" : [
+    "Ludovic Dordet"
+  ],
+  "description" : "Mount hotpluggable/removable storages.",
+  "copyright" : "Copyright © 2018, Ludovic Dordet",
+  "license" : "GPL-3.0",
+  "configurations" : [
+    {
+      "name" : "fmount-app",
+      "targetType" : "executable",
+      "platforms" : [
+        "linux"
+      ],
+      "versions" : [
+        "FMountApp"
+      ],
+      "mainSourceFile" : "src/fmount_app.d",
+      "excludedSourceFiles" : [
+        "src/fumount_app.d"
+      ],
+      "targetName" : "fmount"
+    },
+    {
+      "name" : "fumount-app",
+      "targetType" : "executable",
+      "platforms" : [
+        "linux"
+      ],
+      "versions" : [
+        "FUmountApp"
+      ],
+      "mainSourceFile" : "src/fumount_app.d",
+      "excludedSourceFiles" : [
+        "src/fmount_app.d"
+      ],
+      "targetName" : "fumount"
+    }
+  ],
+  "targetPath" : "bin"
 }

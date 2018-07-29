@@ -1,14 +1,8 @@
 .dub
+bin/
+docs/
 docs.json
 __dummy.html
-docs/
-fmount
-fmount.so
-fmount.dylib
-fmount.dll
-fmount.a
-fmount.lib
-fmount-test-*
 TODO*
 *.exe
 *.o
