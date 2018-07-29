@@ -20,6 +20,8 @@ import std.getopt;
 import std.stdio;
 
 import argsutil;
+import mnt.umount : fumount;
+import run;
 
 /**
  * The `fmount` program entry point.
@@ -47,12 +49,7 @@ void main(string[] args)
                            parsed_args.options);
     }
     else {
-        check_exec_dirs();
-
-        if (verbose >= VbLevel.More)
-            print_args(args);
-
-        // TODO run(...) in this module
+        run_parsed(&fumount, args);
     }
 
 }

@@ -20,6 +20,8 @@ import std.getopt;
 import std.stdio;
 
 import argsutil;
+import mnt.mount : fmount;
+import run;
 
 /**
  * The `fmount` program entry point.
@@ -47,19 +49,13 @@ void main(string[] args)
 
     if (parsed_args.helpWanted)
     {
-
       // FIXME improve getopt formatting.
       defaultGetoptPrinter("Mount a removable device, or any device if enabled"
                            ~" by the system administrator.",
                            parsed_args.options);
     }
     else {
-        check_exec_dirs();
-
-        if (verbose >= VbLevel.More)
-            print_args(args);
-
-        // TODO run(...) in this module
+        run_parsed(&fmount, args);
     }
 
 }

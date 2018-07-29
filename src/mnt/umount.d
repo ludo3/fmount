@@ -19,4 +19,11 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
+module mnt.umount;
+
+import std.stdio : writeln;
+
+void fumount(string[] args) {
+    writeln("running fumount");
+}
 
