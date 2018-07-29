@@ -1,9 +1,9 @@
 // Written in the D programming language.
 
 /**
-`fmount` main entry point.
+main application runner.
 
-The program enables mounting removable devices.
+This module contains code common to all modules with a `main` function.
 
 Copyright: Copyright Ludovic Dordet 2018.
 License:   $(HTTP www.gnu.org/licenses/gpl-3.0.md,
