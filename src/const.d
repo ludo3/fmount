@@ -1,9 +1,7 @@
 // Written in the D programming language.
 
 /**
-`fmount` main entry point.
-
-The program enables mounting removable devices.
+Constants for the `fmount` project.
 
 Copyright: Copyright Ludovic Dordet 2018.
 License:   $(HTTP www.gnu.org/licenses/gpl-3.0.md,
