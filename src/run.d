@@ -55,6 +55,14 @@ void run_parsed(void function(string[]) main, string[] args)
         if (verbose >= VbLevel.More)
             print_args(args);
 
-        main(args);
+        try
+        {
+            main(args);
+        }
+        catch(Exception ex)
+        {
+            if (verbose >= VbLevel.More)
+                writeln(ex.msg);
+        }
 }
 
