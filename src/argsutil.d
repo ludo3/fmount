@@ -285,3 +285,59 @@ void output_args(Output)(Output output, string[] args)
 }
 
 
+/// The exception raised when an error is found in program arguments.
+class ArgumentException : Exception
+{
+
+    /// Create an ArgumentException related to a bad number of arguments.
+    static ArgumentException badNb(size_t min, size_t max, size_t actual)
+    {
+        string fmt;
+        string msg;
+
+        if (max > min)
+        {
+            fmt = "%d arguments, but between %d and %d are expected";
+            msg = fmt.format(actual, min, max);
+        }
+        else
+        {
+            fmt = "%d arguments instead of %d.";
+            msg = fmt.format(actual, min);
+        }
+
+        assert(msg !is null);
+        assert(msg.length > 0);
+
+        return new ArgumentException(msg);
+    }
+
+    /// Create an ArgumentException related to an unexpected argument.
+    static ArgumentException unexpected(string expectedName, string actual)
+    {
+        string fmt = "Unexpected argument '%s' instead of a(n) '%s'.";
+        string msg = fmt.format(actual, expectedName);
+
+        return new ArgumentException(msg);
+    }
+
+    /// Create an ArgumentException related to an unexpected argument.
+    static ArgumentException illegal(string argument, string reason="")
+    {
+        string msg;
+
+        if (reason !is null && reason.length > 0)
+            msg = format!"Illegal argument '%s' : %s."(argument, reason);
+        else
+            msg = format!"Illegal argument '%s'."(argument);
+
+        return new ArgumentException(msg);
+    }
+
+    /// Constructor with the error message.
+    this(string message)
+    {
+        super(message);
+    }
+
+}
