@@ -22,10 +22,12 @@ import constvals : ModePrivateRWX, VbLevel;
 import std.conv : parse;
 import std.file : exists, isDir, mkdirRecurse, readText, setAttributes,
                   FileException;
-import std.path : expandTilde;
+import std.path : dirSeparator, expandTilde;
 import std.process : executeShell, thisProcessID;
+import std.range.primitives : ElementType, isInputRange;
 import std.stdio : writeln;
 import std.string : format, indexOf, join, split;
+import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
 
 
@@ -182,4 +184,41 @@ int read_int_file(string path)
     string content = readText!string(path);
     return parse!int(content);
 }
+
+
+/+
+/**
+ * Join the path components with the path separator `std.path.dirSeparator`.
+ * Params:
+ *     S     = A string type.
+ *     paths = The paths to be joined with `dirSeparator`.
+ */
+S join_paths(S)(S[] paths)
+if (isSomeString!S)
+{
+    return join(paths, dirSeparator);
+}
++/
+
+/**
+ * Join the path components with the path separator `std.path.dirSeparator`.
+ * Params:
+ *     paths = The paths to be joined with `dirSeparator`.
+ */
+string join_paths(string[] paths ...)
+{
+    return join(paths, dirSeparator);
+}
+
+/**
+ * Join the path components with the path separator `std.path.dirSeparator`.
+ * Params:
+ *     paths = An array of paths to be joined with `dirSeparator`.
+ */
+string join_paths(string[] paths)
+{
+    return join(paths, dirSeparator);
+}
+
+alias jn = join_paths;
 
