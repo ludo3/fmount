@@ -22,8 +22,42 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module mnt.mount;
 
 import std.stdio : writeln;
+import std.string : format;
 
+import argsutil : verbose;
+import constvals : VbLevel;
+
+
+/**
+ * Main fmount function.
+ * Params:
+ *     args = The positional arguments.
+ */
 void fmount(string[] args) {
+    string device_path = args[0];
+    string mountpoint;
+
+    if (args.length > 1)
+        mountpoint = args[1];
+    else
+        mountpoint = "";
+
+    if (verbose >= VbLevel.Dbug)
+    {
+        immutable string fmt = q"TXT
+fmount(device_path=%s,
+       mountpoint=%s);
+TXT";
+        writeln(format!fmt(device_path, mountpoint));
+    }
+
+    if (args.length > 1)
+        mountpoint = args[1];
+    else
+    {
+        // TODO retrieve from disk label
+    }
+
     writeln("running fmount");
 }
 
