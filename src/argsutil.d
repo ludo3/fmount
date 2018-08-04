@@ -39,8 +39,11 @@ public import constvals : VbLevel;
  * Returns: a string array with `--key-file` and `--keyfile-size` options
  *          for `cryptsetup luksOpen`.
  */
-string[] passphrase_to_luks_keyfile_args(const string password_file)
+string[] luks_keyfile_args(const string password_file)
 {
+    if (password_file is null || password_file.length == 0)
+        return [];
+
     auto pass_size = getSize(password_file);
 
     const string pass_name = password_file;
