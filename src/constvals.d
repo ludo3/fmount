@@ -127,6 +127,9 @@ enum DevDir : string {
     Uuid = Disk ~ "/by-uuid",
 }
 
+/// The device mapper directory used by cryptsetup.
+static immutable string DevMapperDir = DevDir.Root ~ "/mapper";
+
 
 /// The mode for user-only read-write files.
 static immutable ushort ModePrivateRW = octal!600;
