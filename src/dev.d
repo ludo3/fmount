@@ -21,9 +21,9 @@ module dev;
 
 import std.algorithm : filter, map;
 import std.algorithm.sorting : sort;
-import std.array : array;
-import std.conv : text;
-import std.file : dirEntries, exists, isSymlink, readLink, SpanMode;
+import std.array : appender, array;
+import std.conv : text, to;
+import std.file : dirEntries, exists, isSymlink, readLink, readText, SpanMode;
 import std.path : absolutePath, baseName, dirName, dirSeparator, isAbsolute;
 import std.stdio : writeln;
 import std.string : endsWith, format, indexOf, join, toLower;
@@ -32,7 +32,7 @@ import std.typecons : tuple;
 
 import argsutil : verbose;
 import constvals : DevDir, DevMapperDir, VbLevel;
-import osutil : jn, runCommand;
+import osutil : get_exec_path, jn, readIntFile, runCommand;
 
 alias bn = baseName;
 alias dn = dirName;
@@ -123,10 +123,10 @@ if (isSomeString!S)
 
 /** All reached phisical disk directories. */
 private immutable auto ALL_DISK_DIRS = [
-    DevDir.Root,
-    DevDir.Uuid,
-    DevDir.Label,
-    DevDir.PartUuid,
+    text(DevDir.Root),
+    text(DevDir.Uuid),
+    text(DevDir.Label),
+    text(DevDir.PartUuid),
 ];
 
 
@@ -255,6 +255,20 @@ if (isSomeString!S)
 
 
 /**
+ * Retrieve the DEVPATH of the device at /dev/disk/by-path.
+ * Params:
+ *     S   = A string type.
+ *     dev = A path to a block device.
+ */
+S dev_hardware_path(S)(S dev)
+if (isSomeString!S)
+{
+    return _dev_link_name(dev, DevDir.Path);
+}
+
+
+
+/**
  * Retrieve a blkid value from a device path.
  * Params:
  *     S   = A string type.
@@ -269,7 +283,7 @@ if (isSomeString!S)
         static immutable S fmt = "%s -s '%s' -o value '%s'";
         auto cmd = format!fmt(blkid_path, attr, dev);
         S result = runCommand(cmd);
-        return result.stdout;
+        return result;
     }
     catch(Exception ex)
     {
@@ -323,14 +337,16 @@ if (isSomeString!S)
  *     dev = A path to a block device.
  *     dirs = The directories in which the links should be looked up.
  */
-S[] dev_link_paths(S)(S dev, S[] dirs ...)
+S[] dev_link_paths(S)(S dev, S[] dirs = [])
 if (isSomeString!S)
 {
     S path = dev_path(dev);
-    if (dirs is null || dir.length == 0)
-        dirs = ALL_DISK_DIRS + [ DevMapperDir ];
+    if (dirs is null || dirs.length == 0)
+        dirs = (ALL_DISK_DIRS ~ [ DevMapperDir ]).dup;
 
-    links = [];
+    string[] links;
+    auto linksCat = appender(&links);
+
     foreach (S d; dirs)
     {
         if (endsWith(d, dirSeparator))
@@ -339,7 +355,7 @@ if (isSomeString!S)
         auto files = map!(e => jn(d, e))(dirEntries(d, SpanMode.shallow));
         auto lnks = filter!(f => isSymlink(f)
             && path == absolutePath(jn(d, readLink(f))))(files);
-        links ~= lnks;
+        linksCat ~= lnks;
     }
 
     return links;
@@ -385,7 +401,7 @@ if (isSomeString!S)
  *     dev  = A path to a block device.
  *     dflt = A default value for the filesystem.
  */
-S dev_fs(S)(dev, S dflt="")
+S dev_fs(S)(S dev, S dflt="")
 if (isSomeString!S)
 {
     S blkid = _get_blkid_attr(dev, "TYPE");
@@ -402,7 +418,7 @@ if (isSomeString!S)
  *     dev  = A path to a block device.
  *     dflt = A default value for the filesystem usage.
  */
-S dev_fs_usage(S)(S dev, Sdflt="")
+S dev_fs_usage(S)(S dev, S dflt="")
 if (isSomeString!S)
 {
     S fs = dev_fs(dev);
@@ -429,7 +445,7 @@ if (isSomeString!S)
     immutable S size_path = format!"/sys/class/block/%s/size"(dev_name(dev));
 
     // The size is provided as number of blocks of 512 bytes
-    return 512 * read_int_file(size_path);
+    return 512 * readIntFile(size_path);
 }
 
 
@@ -498,20 +514,20 @@ if (isSomeString!S)
     immutable S part_name = dev_name(dev);
     immutable S sysroot = "/sys/block";
 
-    foreach (S systentry; dirEntries(sysroot))
+    foreach (S sysentry; dirEntries(sysroot, SpanMode.shallow))
     {
-        immutable S sysdir = jn(sysroot, sysentry);
-        foreach (S entry; sysdir)
+        auto sysdir = jn(sysroot, sysentry);
+        foreach (S entry; dirEntries(sysdir, SpanMode.shallow))
         {
             if (entry == part_name)
             {
                 // /sys/block/sdb/sdb1 => sdb
-                return sysentry;
+                return to!S(sysentry);
             }
         }
     }
 
-    return "";
+    return to!S("");
 }
 
 
@@ -529,7 +545,7 @@ if (isSomeString!S)
         hwname = get_disk_name(dev);
     immutable S removable_path = format!"/sys/class/block/%s/removable"(hwname);
 
-    immutable bool ret = read_int_file(removable_path) != 0;
+    immutable bool ret = readIntFile(removable_path) != 0;
 
     if (verbose >= VbLevel.Dbug)
         _dbg_is_("is_removable", dev, ret);
@@ -544,7 +560,7 @@ if (isSomeString!S)
  *     S   = A string type.
  *     dev = A path to a block device.
  */
-S is_partition(S)(S dev)
+bool is_partition(S)(S dev)
 if (isSomeString!S)
 {
     S syspart = format!"/sys/class/block/%s/partition"(dev_name(dev));
@@ -570,7 +586,7 @@ if (isSomeString!S)
 
     bool ret;
 
-    foreach (S e; dirEntries(DevMapperDir))
+    foreach (S e; dirEntries(DevMapperDir, SpanMode.shallow))
     {
         S lnk = jn(DevMapperDir, e);
         if (isSymlink(lnk))
@@ -627,7 +643,7 @@ if (isSomeString!S)
         // 8:0 => disk
         // 11:0 => cd/dvd
         // 254:0 => dm
-        ret = read_file(devtype_path) == "8:0";
+        ret = readText(devtype_path) == "8:0";
     }
 
     if (verbose >= VbLevel.Dbug)
@@ -693,7 +709,7 @@ if (isSomeString!S)
     // Note: pmount uses '_dev_sdXN' as mapping label.
     // Example: DM_NAME='_dev_sdc1' for /dev/sdc1 encrypted partition.
     S prefix = "_dev_";
-    return prefix + dev_name(raw_device);
+    return prefix ~ dev_name(raw_device);
 }
 
 
@@ -715,7 +731,7 @@ if (isSomeString!S)
     if (is_encrypted(disk))
     {
         immutable S dm_name = get_dm_name(disk);
-        foreach(S entry; dirEntries(DevMapperDir))
+        foreach(S entry; dirEntries(DevMapperDir, SpanMode.shallow))
         {
             if (entry == dm_name)
             {
