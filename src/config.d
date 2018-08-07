@@ -18,12 +18,16 @@ module config;
 
 import std.container.dlist : DList;
 import std.container.util : make;
-import std.file : read;
+import std.file : exists, FileException, readText, write;
 import std.range : InputRange;
 import std.regex : matchFirst, regex, Regex;
+import std.stdio : writeln;
 import std.string : format, splitLines;
 
-import osutil : get_dir;
+import argsutil : fake, verbose;
+import constvals : confdir_name, VbLevel;
+import dutil : printThChain;
+import osutil : chown, get_dir, getRealUserAndGroup, jn;
 
 
 /// One line of a configuration file.
@@ -344,7 +348,7 @@ class FileSource : ConfigSource
      */
     string[] readlines()
     {
-        string content = cast(string)(read(_name));
+        string content = readText(_name);
         return splitLines(content);
     }
 
@@ -360,16 +364,6 @@ private static immutable Regex!char RX_KV
 
 private static immutable Regex!char RX_SECTION
     = regex(`^\s*\[\s*(?P<name>\w+)\s*\].*$`);
-
-/*
-enum RX : Regex!char
-{
-    BLANK = regex(`^\s*$`),
-    COMMENT = regex(`^\s*#.*$`),
-    KV = regex(`^\s*(?P<key>\w+)\s*=\s*(?P<value>\S+(?:.*\S))\s*$`),
-    SECTION = regex(`^\s*\[\s*(?P<name>\w+)\s*\].*$`)
-}
-*/
 
 
 /// The readable/writable configuration.
@@ -463,13 +457,13 @@ class Config
          */
         void parseLine(size_t num, string content)
         {
-            auto bkM = matchFirst(content, RX_BLANK);
+            const auto bkM = matchFirst(content, RX_BLANK);
             Line line;
             if (!bkM.empty)
                 line = new Line(num, content);
             else
             {
-                auto comM = matchFirst(content, RX_COMMENT);
+                const auto comM = matchFirst(content, RX_COMMENT);
                 if (!comM.empty)
                     line = new Comment(num, content);
                 else
@@ -534,8 +528,74 @@ class ConfigException : Exception
 /// Create the configuration directory if needed, and return its path.
 string get_confdir()
 {
-    // TODO
-    return "";
+    return get_dir(jn("~", confdir_name));
 }
+
+
+/**
+ * Retrieve a configuration or create a default one.
+ * Params:
+ *     filename        = The name of the configuration file.
+ *     defaultContent = The default configuration content, to be used if the
+ *                       configuration file does not exist yet.
+ *
+ */
+Config get_config(string filename, string defaultContent)
+{
+    string config_file = jn(get_confdir(), filename);
+    Config config;
+
+    if (exists(config_file))
+    {
+        if (verbose >= VbLevel.More)
+            writeln("get_config from ", config_file);
+        try
+        {
+            config.readFile(config_file);
+        }
+        catch(ConfigException cfx)
+        {
+            if (verbose >= VbLevel.Warn)
+                writeln(cfx.toString());
+            if (verbose >= VbLevel.More)
+                printThChain(cfx);
+        }
+        catch(FileException fex)
+        {
+            if (verbose >= VbLevel.Warn)
+            {
+                immutable string _s = "Could not read config '%s' : %s";
+                writeln(format!_s(config_file, fex.toString()));
+                if (verbose >= VbLevel.More)
+                    printThChain(fex);
+            }
+        }
+    }
+    else if (defaultContent !is null && defaultContent.length > 0)
+    {
+        config.readString(defaultContent);
+        if (!fake)
+        {
+            try
+            {
+                write(config_file, defaultContent);
+                chown(getRealUserAndGroup(), config_file);
+            }
+            catch(Exception ex)
+            {
+                if (verbose >= VbLevel.Warn)
+                {
+                    immutable string _s = "Could not write config '%s' : %s";
+                    writeln(format!_s(config_file, ex.toString()));
+                    if (verbose >= VbLevel.More)
+                        printThChain(ex);
+                }
+            }
+        }
+    }
+
+    return config;
+}
+
 
 
