@@ -17,9 +17,12 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
 module run;
-import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
+
 import std.getopt : GetOptException, GetoptResult, getopt;
 import std.stdio : writeln;
+
+import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
+import dutil : printThChain;
 
 /**
  * Call `std.getopt.getopt(args, ...)` and print any option-related exception.
@@ -61,6 +64,8 @@ void run_parsed(void function(string[]) main, string[] args)
         }
         catch(Exception ex)
         {
+            if (verbose >= VbLevel.Dbug)
+                printThChain(ex);
             if (verbose >= VbLevel.More)
                 writeln(ex.msg);
         }
