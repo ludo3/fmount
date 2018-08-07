@@ -16,19 +16,49 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module osutil;
 
-import argsutil;
-import constvals : ModePrivateRWX, VbLevel;
-
-import std.conv : parse;
+import core.stdc.errno : ENOENT, ENOTDIR;
+import std.conv : parse, text, to;
 import std.file : exists, isDir, mkdirRecurse, readText, setAttributes,
                   FileException;
-import std.path : dirSeparator, expandTilde;
-import std.process : executeShell, thisProcessID;
+import std.path : dirSeparator, expandTilde, pathSeparator;
+import std.process : environment, executeShell, ProcessException, thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
 import std.stdio : writeln;
 import std.string : format, indexOf, join, split;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
+
+import argsutil;
+import constvals : ModePrivateRWX, VbLevel;
+
+
+/**
+ * Retrieve the path of an executable file.
+ *
+ * The path is looked in the `PATH` environment variable by default.
+ *
+ * Params:
+ *     name      = The name (and extension, if any) of the executable file.
+ *     exec_dirs = Additional  directories in which the file is searched.
+ *     env_var   = The name of the environment variable (default : `PATH`).
+ */
+string get_exec_path(string name, string[] exec_dirs=[],
+                     string env_var="PATH")
+{
+    string[] dirs = exec_dirs.dup;
+    if (env_var !is null && env_var.length > 0)
+        dirs ~= split(environment.get(env_var, ""), pathSeparator);
+
+    foreach (string exec_dir; dirs)
+    {
+        auto exec_path = jn(exec_dir , name);
+
+        if (exists(exec_path))
+            return exec_path;
+    }
+
+    throw new FileException(name, ENOENT);
+}
 
 
 /**
@@ -83,7 +113,13 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
 }
 
 
-private string getRealUserAndGroup()
+/**
+ * Retrieve the current real user and real group of the running process.
+ *
+ * Returns:
+ *   A colon-separated string `user:group`.
+ */
+string getRealUserAndGroup()
 {
     auto real_ug =
         runCommand(format!"ps --no-headers -oruser,group %d"(thisProcessID));
@@ -117,11 +153,20 @@ string runCommand(string command)
     }
     if (!fake)
     {
-        auto result = executeShell(command);
-        if (result.status == 0)
-            return result.output;
-
-        throw new CommandFailedException(result.status, command);
+        try
+        {
+            auto result = executeShell(command);
+            if (result.status == 0)
+                return result.output;
+            else
+                throw new CommandFailedException(command,
+                                                 result.status,
+                                                 result.output);
+        }
+        catch(ProcessException pex)
+        {
+            throw new CommandFailedException(command, pex);
+        }
     }
 
     return "";
@@ -131,48 +176,78 @@ string runCommand(string command)
 /// The exception raised when a command exits with an error code.
 class CommandFailedException : Exception
 {
-    /// Constructor.
-    this(int code, string cmd)
-    {
-        super(buildMessage(code, cmd));
-        _status = code;
-        _command = cmd;
+    import std.exception : basicExceptionCtors;
+    mixin basicExceptionCtors;
 
-        if (status < 0)
-            _signal = -status;
+    /// Constructor with a non-zero return code.
+    this(string cmd,
+         int code,
+         string output = null,
+         string file = __FILE__,
+         size_t line = __LINE__)
+    {
+        super(buildMessage(cmd, code, output), file, line);
     }
 
-    /// Retrieve the return code of the command.
-    @property
-    int status() const { return _status; }
+    /// Constructor with a causing exception.
+    this(string cmd,
+         Throwable reason = null)
+    {
+        this(cmd, __FILE__, __LINE__, reason);
+    }
 
-    /// Retrieve the executed command.
-    @property
-    string command() const { return _command; }
+    /// Constructor with file, line and a causing exception.
+    this(string cmd,
+         string file = __FILE__,
+         size_t line = __LINE__,
+         Throwable reason = null)
+    {
+        super(buildMessage(cmd, reason), file, line, reason);
+    }
 
     private:
-        static string buildMessage(int status, string command)
+        static string buildMessage(string command, int status, string output)
         {
             string msg;
             int code;
 
+            if (output is null)
+                output = "";
+            else
+                output ~= "\n";
+
             if (status > 0)
             {
-                msg = "Command '%s' failed with error code %d.";
+                msg = "%sCommand '%s' failed with error code %d.";
                 code = status;
             }
             else
             {
-                msg = "Command '%s' stopped by signal %d.";
+                msg = "%sCommand '%s' stopped by signal %d.";
                 code = -status;
             }
 
-            return format(msg, command, code);
+            return format(msg, output, command, code);
         }
 
-        int _status;
-        int _signal;
-        string _command;
+        static string buildMessage(string command, Throwable reason)
+        {
+            string msg;
+            string sReason;
+
+            if (reason !is null)
+            {
+                msg = "Command '%s' failed : %s";
+                sReason = text(reason.message());
+            }
+            else
+            {
+                msg = "Command '%s' failed.%s";
+                sReason = "";
+            }
+
+            return format(msg, command, sReason);
+        }
 }
 
 
@@ -185,20 +260,6 @@ int read_int_file(string path)
     return parse!int(content);
 }
 
-
-/+
-/**
- * Join the path components with the path separator `std.path.dirSeparator`.
- * Params:
- *     S     = A string type.
- *     paths = The paths to be joined with `dirSeparator`.
- */
-S join_paths(S)(S[] paths)
-if (isSomeString!S)
-{
-    return join(paths, dirSeparator);
-}
-+/
 
 /**
  * Join the path components with the path separator `std.path.dirSeparator`.
@@ -220,5 +281,38 @@ string join_paths(string[] paths)
     return join(paths, dirSeparator);
 }
 
+/// A short alias for join_path.
 alias jn = join_paths;
+
+
+/**
+ * Check whether a path points to an existing directory.
+ * Throws: std.file.FileException if no entry exists at `path` or if it exists
+ *         but is not a directory.
+ */
+void assertDirExists(S)(S path)
+if (isSomeString!S)
+{
+    auto errno = 0;
+
+    if ( !exists(path) )
+        errno = ENOENT;
+    else if ( !isDir(path) )
+        errno = ENOTDIR;
+
+    if (errno)
+        throw new FileException(path, errno);
+}
+
+
+/**
+ * Read a text file containing only an integer.
+ */
+int readIntFile(S)(S path)
+if (isSomeString!S)
+{
+    return to!int(readText(path));
+}
+
+
 
