@@ -24,10 +24,11 @@ module mnt.mount;
 import std.stdio : writeln;
 import std.string : format;
 
-import argsutil : verbose;
+import argsutil : exec_dirs, verbose;
 import constvals : VbLevel;
 import dev : dev_descr, dev_display, dev_path;
-import mnt.common : check_user;
+import mnt.common : check_user, find_mountpoint;
+import osutil : get_exec_path;
 
 
 /**
@@ -60,8 +61,53 @@ TXT";
         // TODO retrieve from disk label
     }
 
-    writeln("running fmount");
     check_user(device_path, "fmount");
+
+    immutable mount_prog = get_exec_path("mount", exec_dirs);
+
+    auto current_mountpoint = find_mountpoint(device_path);
+    auto descr = dev_descr(device_path, dev_display(device_path));
+
+    if (current_mountpoint !is null && current_mountpoint.length > 0)
+    {
+        if (verbose >= VbLevel.Info)
+        {
+            immutable fmt = "Note : %s is already mounted at %s .";
+            writeln(format!fmt(descr, current_mountpoint));
+        }
+        return;
+    }
+
+    if (verbose >= VbLevel.Info)
+        writeln("Mounting ", descr);
+
+    if (mountpoint is null || mountpoint.length == 0)
+        mountpoint = dev_display(device_path);
+
+    /*
+    // request a password if needed,
+    // put it password into a temporary file,
+    // and tell to 'fmount' to use that password file.
+    try:
+        with read_password(device_path,
+                           pass_file=kw.get('passphrase'),
+                           strict=True,
+                           verbose=verbose,
+                           test=test,
+                           delete=False) as pwf:
+            do_mount(mount_prog,
+                     device_path,
+                     password_file=pwf,
+                     mountpoint=mountpoint,
+                     verbose=verbose,
+                     test=test,
+                     **kw)
+    except UserWarning as uw:
+        if verbose >= vbmore:
+            print_exc()
+        elif verbose >= vbwarn:
+            print(uw)
+    */
 }
 
 
