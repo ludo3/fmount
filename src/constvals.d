@@ -123,6 +123,9 @@ enum DevDir : string {
     /// Device (short) partition UUID directory.
     PartUuid = Disk ~ "/by-partuuid",
 
+    /// Device hwardware path directory.
+    Path = Disk ~ "/by-path",
+
     /// Device (long) UUID directory.
     Uuid = Disk ~ "/by-uuid",
 }
