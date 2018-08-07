@@ -26,6 +26,8 @@ import std.string : format;
 
 import argsutil : verbose;
 import constvals : VbLevel;
+import dev : dev_descr, dev_display, dev_path;
+import mnt.common : check_user;
 
 
 /**
@@ -34,7 +36,7 @@ import constvals : VbLevel;
  *     args = The positional arguments.
  */
 void fmount(string[] args) {
-    string device_path = args[0];
+    immutable string device_path = dev_path(args[0]);
     string mountpoint;
 
     if (args.length > 1)
@@ -59,6 +61,7 @@ TXT";
     }
 
     writeln("running fmount");
+    check_user(device_path, "fmount");
 }
 
 
