@@ -18,12 +18,12 @@ module osutil;
 
 import core.stdc.errno : ENOENT, ENOTDIR;
 import std.conv : parse, text, to;
-import std.file : exists, isDir, mkdirRecurse, readText, setAttributes,
-                  FileException;
+import std.file : exists, isDir, mkdirRecurse, readText, remove,
+                  setAttributes, FileException;
 import std.path : dirSeparator, expandTilde, pathSeparator;
 import std.process : environment, executeShell, ProcessException, thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
-import std.stdio : writeln;
+import std.stdio : File, writeln;
 import std.string : format, indexOf, join, split;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
@@ -315,4 +315,14 @@ if (isSomeString!S)
 }
 
 
+/**
+ * Close and delete a file immediately after.
+ * Params:
+ *     tobeRemoved = A `File` object to be closed and then removed.
+ */
+void closeAndRemove(File tobeRemoved)
+{
+    tobeRemoved.close();
+    remove(tobeRemoved.name);
+}
 
