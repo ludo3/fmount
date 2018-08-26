@@ -19,13 +19,16 @@ module luks;
 import core.thread : Thread;
 import core.time : msecs;
 import std.array : join;
+import std.file : exists;
 import std.stdio : writeln;
 import std.string : format;
+import std.traits : hasMember, isSomeString;
 
 import argsutil : check_exec_dirs, luks_keyfile_args, fake, passphrase_file,
                   VbLevel, verbose;
 import constvals : DevMapperDir;
-import osutil : runCommand;
+import dev : dev_path;
+import osutil : jn, runCommand;
 
 
 /**
@@ -49,16 +52,27 @@ if (isSomeString!S)
 /**
  * Open a LUKS encrypted device.
  * Params:
- *     S            = A string type.
- *     device       = The path to a device.
- *     mapping_name = The name for the decrypted device.
+ *     S             = A string type.
+ *     F             = A file-like type with a `name`member, or the `null` type.
+ *     device        = The path to a device.
+ *     password_file = A `stdio.File` like object with a `name` property.
+ *     mapping_name  = The name for the decrypted device.
+ *
+ * Returns:
+ *     A path to a device mapping.
  */
-S luksOpen(S)(S device, S mapping_name)
-if (isSomeString!S)
+S luksOpen(S, F)(S device, F password_file, S mapping_name)
+if (isSomeString!S &&
+    (is(F == typeof(null)) || hasMember!(F, "name")))
 {
-    immutable auto openCmdArr = ["/sbin/cryptsetup"]
-                              ~ luks_keyfile_args(passphrase_file)
-                              ~ ["luksOpen", dev_path(device), mapping_name];
+    string password_file_name;
+    if (password_file)
+        password_file_name = password_file.name;
+
+    immutable auto openCmdArr = cast(immutable(string[]))
+            (["/sbin/cryptsetup"]
+           ~ luks_keyfile_args(password_file_name)
+           ~ ["luksOpen", dev_path(device), mapping_name]);
     immutable string openCmd = join(openCmdArr, " ");
 
     runCommand(openCmd);
@@ -81,7 +95,7 @@ if (isSomeString!S)
 void luksClose(S)(S mapping_name)
 if (isSomeString!S)
 {
-    closeCmdArr = ["/sbin/cryptsetup", "luksClose", mapping_name];
+    auto closeCmdArr = ["/sbin/cryptsetup", "luksClose", mapping_name];
     string closeCmd = join(closeCmdArr, " ");
 
     // luksClose fails if it is run immediately after a formatting...

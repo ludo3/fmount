@@ -17,11 +17,11 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module mnt.common;
 
 import core.stdc.errno : ENOENT, ENOTDIR, EPERM;
-import std.algorithm : canFind, startsWith;
+import std.algorithm : canFind, map, startsWith;
 import std.array : array, split;
 import std.conv : to;
 import std.file : dirEntries, exists, FileException, isDir, mkdir, readText,
-                  rmdir, SpanMode, write;
+                  remove, rmdir, SpanMode, write;
 import std.path : dirName, isAbsolute;
 import std.process : ProcessException;
 import std.regex : matchFirst, regex;
@@ -29,7 +29,8 @@ import std.stdio : writeln;
 import std.string : format;
 import std.traits : isSomeString;
 
-import argsutil : VbLevel, verbose;
+import appconfig;
+import argsutil : fake, VbLevel, verbose;
 import constvals : how_to_run_as_root;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
 import dutil : printThChain;
@@ -87,7 +88,7 @@ private enum CreatedBy : string
  *     S    = A string type.
  *     path = The path to a directory to be checked or created.
  */
-void ensure_dir_exists(S)(S path)
+void ensure_mntdir_exists(S)(S path)
 if (isSomeString!S)
 {
     assertDirExists(dirName(path));
@@ -99,7 +100,7 @@ if (isSomeString!S)
         if (!fake)
             mkdir(path);
 
-        autocreated_file = jn(path, CreatedBy.Fmount.toString());
+        auto autocreated_file = jn(path, CreatedBy.Fmount);
         if (verbose >= VbLevel.Dbug)
             writeln("Creating file ", autocreated_file);
         if (!fake)
@@ -122,12 +123,12 @@ void remove_automatically_created_dir(S)(S path)
 if (isSomeString!S)
 {
     auto autocreated = false;
-    auto entries = [];
+    string[] entries;
     if (exists(path) && isDir(path))
     {
         try
         {
-            entries = array(dirEntries(path, SpanMode.shallow));
+            entries = map!("a.name")(dirEntries(path, SpanMode.shallow)).array;
         }
         catch(Exception ex)
         {
@@ -136,13 +137,13 @@ if (isSomeString!S)
         }
     }
 
-    if (entries.length == 1)
+    if ((entries !is null) && entries.length == 1)
     {
-        if (entries[0] == CreatedBy.Fmount.toString()
-            || entries[0] == CreatedBy.Pmount.toString())
+        if (entries[0] == CreatedBy.Fmount
+            || entries[0] == CreatedBy.Pmount)
         {
             autocreated = true;
-            autocreated_file = jn(path, entries[0].name);
+            auto autocreated_file = jn(path, entries[0]);
 
             if (verbose >= VbLevel.Dbug)
                 writeln("Removing ", autocreated_file);
@@ -162,8 +163,8 @@ if (isSomeString!S)
 
     if (autocreated)
     {
-        if (verbose >= vbmore)
-            print("Removing directory ", path);
+        if (verbose >= VbLevel.More)
+            writeln("Removing directory ", path);
         if (!fake)
             rmdir(path);
     }

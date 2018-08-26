@@ -21,7 +21,8 @@ import std.conv : parse, text, to;
 import std.file : exists, isDir, mkdirRecurse, readText, remove,
                   setAttributes, FileException;
 import std.path : dirSeparator, expandTilde, pathSeparator;
-import std.process : environment, executeShell, ProcessException, thisProcessID;
+import std.process : environment, execute, executeShell, ProcessException,
+                     thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
 import std.stdio : File, writeln;
 import std.string : format, indexOf, join, split;
@@ -173,13 +174,45 @@ string runCommand(string command)
 }
 
 
+/**
+ * Execute an executable file with its arguments  and return its output, or
+ * raise a CommandFailedException.
+ */
+string runCommand(string[] command)
+{
+    if (verbose >= VbLevel.Info)
+    {
+        writeln(command.join(" "));
+    }
+    if (!fake)
+    {
+        try
+        {
+            auto result = execute(command);
+            if (result.status == 0)
+                return result.output;
+            else
+                throw new CommandFailedException(command,
+                                                 result.status,
+                                                 result.output);
+        }
+        catch(ProcessException pex)
+        {
+            throw new CommandFailedException(command, pex);
+        }
+    }
+
+    return "";
+}
+
+
 /// The exception raised when a command exits with an error code.
 class CommandFailedException : Exception
 {
     import std.exception : basicExceptionCtors;
     mixin basicExceptionCtors;
 
-    /// Constructor with a non-zero return code.
+    /// Constructor with a shell command and a non-zero return code.
     this(string cmd,
          int code,
          string output = null,
@@ -189,11 +222,28 @@ class CommandFailedException : Exception
         super(buildMessage(cmd, code, output), file, line);
     }
 
+    /// Constructor with an executable command and a non-zero return code.
+    this(string[] cmd,
+         int code,
+         string output = null,
+         string file = __FILE__,
+         size_t line = __LINE__)
+    {
+        super(buildMessage(cmd.join(" "), code, output), file, line);
+    }
+
     /// Constructor with a causing exception.
     this(string cmd,
          Throwable reason = null)
     {
         this(cmd, __FILE__, __LINE__, reason);
+    }
+
+    /// Constructor with a causing exception.
+    this(string[] args,
+         Throwable reason = null)
+    {
+        this(args.join(" "), __FILE__, __LINE__, reason);
     }
 
     /// Constructor with file, line and a causing exception.

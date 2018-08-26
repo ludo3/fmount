@@ -55,7 +55,7 @@ class Line
     /**
      * Retrieve the line number.
      */
-    size_t getNum()
+    size_t getNum() const
     {
         return _num;
     }
@@ -63,7 +63,7 @@ class Line
     /**
      * Retrieve the line content.
      */
-    string getContent()
+    string getContent() const
     {
         return _content;
     }
@@ -109,7 +109,7 @@ class KeyValue : Line
     /**
      * Retrieve the key.
      */
-    string getKey()
+    string getKey() const
     {
         return _key;
     }
@@ -125,7 +125,7 @@ class KeyValue : Line
     /**
      * Retrieve the value.
      */
-    string getValue()
+    string getValue() const
     {
         return _value;
     }
@@ -229,7 +229,37 @@ class Section : Line
      */
     void addLine(Line line)
     {
-        _lines ~= line;
+        // Prevent this from adding a container to itself.
+        if (line !is this)
+        {
+            _lines ~= line;
+            if (is(typeof(line) == KeyValue))
+            {
+                KeyValue kv = cast(KeyValue)line;
+                _values[kv.getKey()] = kv;
+            }
+        }
+    }
+
+    /// Check whether a named value is available.
+    bool hasKey(string name) const
+    {
+        return ((name in _values) !is null);
+    }
+
+    /// Retrieve a named value.
+    string getString(string name) const
+    {
+        const KeyValue kv = cast(const KeyValue)_values[name];
+        return kv.getValue();
+    }
+
+    /// Retrieve a typed value.
+    T getValue(T)(string name) const
+    {
+        T v;
+        _values[name].readTypedValue(v);
+        return v;
     }
 
     private:
@@ -242,6 +272,8 @@ class Section : Line
         string _name;
 
         DList!Line _lines;
+
+        Line[string] _values;
 }
 
 
@@ -403,6 +435,8 @@ class Config
         {
             parseLine(++lineNum, s);
         }
+
+        _currentSection = _mainSection;
     }
 
     /// Retrieve the main (unnamed) section.
@@ -421,6 +455,13 @@ class Config
     ref Section getSection(string name)
     {
         return _namedSections[name];
+    }
+
+    /// Add a named section.
+    ref Section addSection(Section sec)
+    {
+        _namedSections[sec.getName()] = sec;
+        return getSection(sec.getName());
     }
 
     /// Resets the configuration.
@@ -481,7 +522,10 @@ class Config
                         if (!secM.empty)
                         {
                             string name = secM["name"];
-                            line = new Section(num, content, name);
+                            Section sec = new Section(num, content, name);
+                            line = sec;
+                            _namedSections[name] = sec;
+                            _currentSection = sec;
                         }
                         else
                             throw new ConfigException(num, content);

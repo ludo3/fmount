@@ -18,14 +18,20 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module ui;
 
+import std.array : join;
 import std.conv : text;
 import std.exception : basicExceptionCtors;
 import std.format : format;
+import std.range.primitives : ElementType, isInputRange;
 import std.stdio : writeln;
 import std.string : fromStringz, toStringz;
+import std.traits : isSomeChar, isSomeString;
 import unistd = core.sys.linux.unistd;
 
-import argsutil : VbLevel, verbose;
+import argsutil : passphrase_file, VbLevel, verbose;
+import dev : dev_descr, dev_display, is_encrypted;
+import file : File;
+import tempfile : NamedTemporaryFile;
 
 
 private string _getpass(const string prompt)
@@ -71,6 +77,98 @@ string getpass(string reason, bool confirm = false)
 class PasswordException : Exception
 {
     mixin basicExceptionCtors;
+}
+
+
+/**
+ * Retrieve a password from a file or through a console entry.
+ *
+ * Params:
+ *     dev = The path to a device file.
+ *     confirm_for_encryption = to be set to `true` when a password is being
+ *                              created, i.e. when encrypting a device.
+ *
+ *
+ *
+ *
+ *
+ *
+ * Returns:
+ *     A `File` object, which is a `tempfile.NamedTemporaryFile` if the
+ *     `passphrase_file` option is unset.
+ *     If the password is not being created and the device is not encrypted then
+ *     a `null` reference is returned.
+ */
+auto read_password(string dev,
+                   bool confirm_for_encryption=false)
+{
+    string descr = dev_descr(dev, dev_display(dev));
+
+    if (confirm_for_encryption || is_encrypted(dev))
+    {
+        if (passphrase_file)
+            return new File(passphrase_file, "r");
+        else
+        {
+            auto pwf = new NamedTemporaryFile("fmount", "", "w+b");
+
+                pwf.write(getpass(descr, confirm_for_encryption));
+                pwf.flush();
+                return pwf;
+        }
+    }
+    else
+        return null;
+}
+
+
+/**
+ * Display one warning.
+ *
+ * Params:
+ *   strict     = If `true` then the message is shown on the console, as if
+ *                `verbose` was set to `vbmore=3`.
+ *   String     = A string type.
+ *   messages   = The messages to be shown.
+ */
+void show_warnings(String)(bool strict, String message)
+if (isSomeString!String ||
+    (isInputRange!String &&
+     isSomeChar!(ElementType!String)))
+{
+    show_warnings(strict, [message]);
+}
+
+
+/**
+ * Display one or more warning(s).
+ *
+ * Params:
+ *   strict     = If `true` then the message is shown on the console, as if
+ *                `verbose` was set to `vbmore=3`.
+ *   Strings    = An input range of strings.
+ *   messages   = The messages to be shown.
+ */
+void show_warnings(Strings)(bool strict, Strings messages)
+if (isInputRange!Strings &&
+    (isInputRange!(ElementType!Strings) &&
+     isSomeChar!(ElementType!(ElementType!Strings))))
+{
+    if (strict || verbose >= VbLevel.More)
+        show_warning(messages.join("\n"));
+}
+
+
+/**
+ * Display a warning on the console.
+ */
+void show_warning(String)(String message)
+if (isSomeString!String ||
+    (isInputRange!String &&
+     isSomeChar!(ElementType!String)))
+{
+    if (verbose >= VbLevel.Warn)
+        writeln(message);
 }
 
 
