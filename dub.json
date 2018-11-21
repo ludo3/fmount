@@ -6,6 +6,10 @@
   "description" : "Mount hotpluggable/removable storages.",
   "copyright" : "Copyright © 2018, Ludovic Dordet",
   "license" : "GPL-3.0",
+  "dependencies": {
+		"sdlang-d": "~>0.10.4"
+	},
+
   "configurations" : [
     {
       "name" : "fmount-app",
@@ -37,6 +41,12 @@
       ],
       "targetName" : "fumount"
     }
+  ],
+  "importPaths" : [
+    "src"
+  ],
+  "sourcePaths" : [
+    "src"
   ],
   "targetPath" : "bin"
 }
