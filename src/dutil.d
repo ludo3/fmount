@@ -15,6 +15,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
 module dutil;
+import std.array : replace;
 import std.conv : to;
 import std.format : format;
 import std.range.primitives : ElementType, hasLength;
@@ -118,21 +119,53 @@ struct SrcInfo
         /// Common way to retrieve a string description.
         string toString() const { return shortDescription; }
 
+        /**
+         * Create a custom description.
+         *
+         * The following keys are simply replaced with their actual values:
+         *
+         * $(BOOKTABLE The following keys are simply replaced with their actual
+         * values:, $(TR $(TH Key) $(TH Value))
+         *
+         * $(TR $(TD $B( "${file}")) $(TD The file path.))
+         *
+         * $(TR $(TD $B( "${line}")) $(TD The line.))
+         *
+         * $(TR $(TD $(B "${func}")) $(TD The function name.))
+         *
+         * $(TR $(TD $(B "${fargs}")) $(TD The function return type, name and
+         * argument types.))
+         *
+         * $(TR $(TD $(B "${mod}")) $(TD The module name.))
+         * )
+         */
+        string customDescription(string fmt) const
+        {
+            if (fmt is null || fmt.length == 0)
+                return fmt;
+
+            return fmt.replace("${file}", file)
+                      .replace("${line}", to!string(line))
+                      .replace("${func}", funcName)
+                      .replace("${fargs}", prettyFuncName)
+                      .replace("${mod}", moduleName);
+        }
+
         /// Use this struct as a `"@file(line): "` string value.
         alias shortDescription this;
 
     private:
-        /**
-         * DLang specification: No default constructor available if at least one
-         * with parameters exists.
-         */
-        @disable this();
-
         string _file;
         size_t _line;
         string _funcName;
         string _prettyFuncName;
         string _moduleName;
+
+        /**
+         * DLang specification: No default constructor available if at least one
+         * with parameters exists.
+         */
+        @disable this();
 }
 
 /// Create an SrcInfo instance.
@@ -144,6 +177,49 @@ SrcInfo srcinfo(string file=__FILE__,
 {
     return SrcInfo(file, line, funcName, prettyFuncName, moduleName);
 }
+
+///
+unittest
+{
+    import std.algorithm.comparison : equal;
+
+    void testSrcInfo()
+    {
+        // Note: the following declarations must be on the same line.
+        immutable size_t l = __LINE__; immutable info = srcinfo;
+        immutable string f = __FILE__;
+        immutable string fn = __FUNCTION__;
+        immutable string pf = __PRETTY_FUNCTION__;
+        immutable string m = __MODULE__;
+
+        immutable ln = to!string(l);
+
+        assert(info.file == f);
+        assert(info.line == l);
+        assert(info.funcName == fn);
+        assert(info.prettyFuncName == pf);
+        assert(info.moduleName == m);
+
+        assert(fn == "dutil.__unittest_L"~to!string(l-7)~"_C1.testSrcInfo", fn);
+        assert(info.shortDescription == "@src/dutil.d("~ln~"): "~fn~" ");
+
+        string s = info;
+        assert(s.equal(info.shortDescription));
+
+        assert(info.longDescription == "@src/dutil.d("~ln~"): "~pf~" ");
+        assert(info.funcDetails == m ~ " : " ~ pf ~ " (" ~ ln ~ ") ");
+
+        assert(info.customDescription("") == "");
+        immutable _fmt =
+            "In ${mod}(${file}), line ${line}: ${func} === ${fargs}";
+        assert(info.customDescription(_fmt) ==
+            ("In " ~ m ~ "(" ~ f ~ "), line " ~ ln ~ ": "
+            ~ fn ~ " === " ~ pf));
+    }
+
+    testSrcInfo;
+}
+
 
 /// Describe a file path and line number as`"@file(line): "` .
 struct SrcLn
