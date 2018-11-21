@@ -16,630 +16,439 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module config;
 
-import std.container.dlist : DList;
-import std.container.util : make;
-import std.file : exists, FileException, readText, write;
-import std.range : InputRange;
-import std.regex : matchFirst, regex, Regex;
-import std.stdio : writeln;
-import std.string : format, splitLines;
+import std.file : exists, isDir, isFile, write;
+import std.path : dirName;
+import std.stdio : writefln;
+import std.string : indexOf;
 
-import argsutil : fake, verbose;
-import constvals : confdir_name, VbLevel;
-import dutil : printThChain;
-import osutil : chown, get_dir, getRealUserAndGroup, jn;
-
-
-/// One line of a configuration file.
-class Line
-{
-    /// Construct one empty first line.
-    this()
-    {
-        this(0, "");
-    }
-
-    /// Construct one line with its content.
-    this(size_t num, string content)
-    {
-        _num = num;
-        _content = content;
-    }
-
-    /// Release references to any data.
-    ~this()
-    {
-        _content = null;
-    }
-
-    /**
-     * Retrieve the line number.
-     */
-    size_t getNum() const
-    {
-        return _num;
-    }
-
-    /**
-     * Retrieve the line content.
-     */
-    string getContent() const
-    {
-        return _content;
-    }
-
-    private:
-        /// The line number.
-        size_t _num;
-
-        /// The line content, without any trailing newline character (sequence).
-        string _content;
-}
-
-
-/// A configuration key-value pair.
-class KeyValue : Line
-{
-    /// Default constructor.
-    this()
-    {
-        this("", "");
-    }
-
-    /// Constructor with key and value only.
-    this(string key, string value)
-    {
-        super();
-        initThis(key, value);
-    }
-
-    /// Constructor with full content.
-    this(size_t num, string line, string key, string value)
-    {
-        super(num, line);
-        initThis(key, value);
-    }
-
-    /// Destructor.
-    ~this()
-    {
-        _value = null;
-        _key = null;    }
-
-    /**
-     * Retrieve the key.
-     */
-    string getKey() const
-    {
-        return _key;
-    }
-
-    /**
-     * Replace the key.
-     */
-    void setKey(string key)
-    {
-        _key = key;
-    }
-
-    /**
-     * Retrieve the value.
-     */
-    string getValue() const
-    {
-        return _value;
-    }
-
-    /**
-     * Replace the value.
-     */
-    void setValue(string value)
-    {
-        _value = value;
-    }
-
-    /**
-     * Update a typed value from the configuration.
-     */
-    void readTypedValue(T)(ref T v)
-    {
-        v = cast(T)(getValue());
-    }
-
-    /**
-     * Update the configuration from a typed value.
-     */
-    void writeTypedValue(T)(T v)
-    {
-        setValue(v);
-    }
-
-    private:
-
-        /// Initialize the key and value.
-        void initThis(string key, string value)
-        {
-            this._key = key;
-            this._value = value;
-        }
-
-        /// The key of the key-value pair.
-        string _key;
-
-        /// The value of the key-value pair.
-        string _value;
-}
+import argsutil : VbLevel, verbose;
+import sdlang : parseFile, parseSource, SDLangException, Tag;
 
 
 /**
- * A configuration section.
- *
- * Note: the first configuration part without section name is contained within
- * an unnamed section.
+ * A simple SDLang-formatted configuration wrapper, using one or several
+ * configuration sources.
  */
-class Section : Line
-{
-    /// Constructor for the first configuration part.
-    this()
-    {
-        super();
-        initThis("");
-    }
-
-    /// Constructor for a named section.
-    this(size_t num, string line, string name)
-    {
-        super(num, line);
-        initThis(_name);
-    }
-
-    ~this()
-    {
-        destroy(_lines);
-        _name = null;
-    }
-
-    /**
-     * Retrieve the section name, or an empty string for the first
-     * configuration part.
-     */
-    string getName()
-    {
-        return _name;
-    }
-
-    /**
-     * Replace the section name.
-     */
-    void setName(string name)
-    {
-        _name = name;
-    }
-
-    /**
-     * Retrieve the content.
-     */
-     ref DList!Line getLines()
-     {
-        return _lines;
-     }
-
-    /**
-     * Add a line to the section.
-     */
-    void addLine(Line line)
-    {
-        // Prevent this from adding a container to itself.
-        if (line !is this)
-        {
-            _lines ~= line;
-            if (is(typeof(line) == KeyValue))
-            {
-                KeyValue kv = cast(KeyValue)line;
-                _values[kv.getKey()] = kv;
-            }
-        }
-    }
-
-    /// Check whether a named value is available.
-    bool hasKey(string name) const
-    {
-        return ((name in _values) !is null);
-    }
-
-    /// Retrieve a named value.
-    string getString(string name) const
-    {
-        const KeyValue kv = cast(const KeyValue)_values[name];
-        return kv.getValue();
-    }
-
-    /// Retrieve a typed value.
-    T getValue(T)(string name) const
-    {
-        T v;
-        _values[name].readTypedValue(v);
-        return v;
-    }
-
-    private:
-        void initThis(string name)
-        {
-            _name = name;
-            _lines = make!(DList!Line);
-        }
-
-        string _name;
-
-        DList!Line _lines;
-
-        Line[string] _values;
-}
-
-
-class Comment : Line
-{
-    /// Constructor for an empty comment.
-    this()
-    {
-        this(0, "#");
-    }
-
-    /// Constructor.
-    this(size_t num, string content)
-    {
-        super(num, content);
-    }
-}
-
-
-/**
- * Define the interface for configuration sources : file, content.
- */
-interface ConfigSource
-{
-    /**
-     * Retrieve the source name or an empty string when a name is not
-     * available.
-     */
-    string getName();
-
-    /**
-     * Retrieve the lines containing the configuration.
-     */
-    string[] readlines();
-}
-
-
-/**
- * A string containing the configuration.
- */
-class StringSource : ConfigSource
-{
-    /// Constructor.
-    this(string content)
-    {
-        _lines = splitLines(content);
-    }
-
-    /// Destructor.
-    ~this()
-    {
-        _lines = null;
-    }
-
-    /**
-     * Retrieve the source name or an empty string when a name is not
-     * available.
-     */
-    string getName()
-    {
-        return "";
-    }
-
-    /**
-     * Retrieve the lines containing the configuration.
-     */
-    string[] readlines()
-    {
-        return _lines[];
-    }
-
-    private string[] _lines;
-}
-
-
-/**
- * A file containing the configuration.
- */
-class FileSource : ConfigSource
-{
-    /// Constructor.
-    this(string name)
-    {
-        _name = name;
-    }
-
-    /// Destructor.
-    ~this()
-    {
-        _name = null;
-    }
-
-    /**
-     * Retrieve the source name or an empty string when a name is not
-     * available.
-     */
-    string getName()
-    {
-        return _name;
-    }
-
-    /**
-     * Retrieve the lines containing the configuration.
-     */
-    string[] readlines()
-    {
-        string content = readText(_name);
-        return splitLines(content);
-    }
-
-    private string _name;
-}
-
-
-private static immutable Regex!char RX_BLANK = regex(`^\s*$`);
-private static immutable Regex!char RX_COMMENT = regex(`^\s*#.*$`);
-
-private static immutable Regex!char RX_KV
-    = regex(`^\s*(?P<key>\w+)\s*=\s*(?P<value>\S+(?:.*\S))\s*$`);
-
-private static immutable Regex!char RX_SECTION
-    = regex(`^\s*\[\s*(?P<name>\w+)\s*\].*$`);
-
-
-/// The readable/writable configuration.
 class Config
 {
-    /// Constructor.
-    this()
-    {
-    }
-
-    /**
-     * Read a configuration contained in memory.
-     */
-    void readString(string content)
-    {
-        readSource(new StringSource(content));
-    }
-
-    /**
-     * Read a configuration contained in a file.
-     */
-    void readFile(string path)
-    {
-        readSource(new FileSource(path));
-    }
-
-    /**
-     * Read a configuration from a custom source.
-     */
-    void readSource(ConfigSource source)
-    {
-        clear();
-        initThis();
-
-        int lineNum;
-        foreach (ref string s; source.readlines())
+    public:
+        /**
+         * Add a configuration source.
+         *
+         * First sources are preferred, thus sources should be added in that
+         * typical order: user's config, local config, system config.
+         *
+         * No source should be added after a `get` method has been called at
+         * least once, or you should know what you are doing.
+         *
+         *  Parameters:
+         *    source = either a file path or a configuration content.
+         */
+        void addSource(inout(string) source)
         {
-            parseLine(++lineNum, s);
-        }
+            _sources ~= source;
 
-        _currentSection = _mainSection;
-    }
-
-    /// Retrieve the main (unnamed) section.
-    ref Section getMainSection()
-    {
-        return _mainSection;
-    }
-
-    /// Check whether a named section exists.
-    bool hasSection(string name) const
-    {
-        return (name in _namedSections) != null;
-    }
-
-    /// Retrieve a named section.
-    ref Section getSection(string name)
-    {
-        return _namedSections[name];
-    }
-
-    /// Add a named section.
-    ref Section addSection(Section sec)
-    {
-        _namedSections[sec.getName()] = sec;
-        return getSection(sec.getName());
-    }
-
-    /// Resets the configuration.
-    void clear()
-    {
-        foreach (Section s; _namedSections.values)
-            destroy(s);
-
-        destroy(_mainSection);
-        _currentSection = null;
-    }
-
-    /// Initialize an empty configuration.
-    void initEmpty()
-    {
-        initThis();
-    }
-
-    private:
-        void initThis()
-        {
-            _mainSection = new Section();
-            _namedSections.clear();
-            _currentSection = _mainSection;
+            if (parsed)
+            {
+                /**
+                 * At least one configuration source has been parsed, thus this
+                 * new source must be parsed immediately before any further
+                 * `get` call.
+                 */
+                parseOneSource(source);
+            }
         }
 
         /**
-         * Parse a configuration line as a comment, a section header or a
-         * key-value pair.
-         *
-         * Params:
-         *     num     = The one-based line number.
-         *     content = The line content, without any trailing newline.
+         * Retrieve a configuration attribute or value, or the default value
+         * if the name could not be found in any configuration source.
          */
-        void parseLine(size_t num, string content)
+        T get(T)(string name, T defaultValue = T.init)
         {
-            const auto bkM = matchFirst(content, RX_BLANK);
-            Line line;
-            if (!bkM.empty)
-                line = new Line(num, content);
+            ensureParsed();
+
+            T getImpl(Tag tag)
+            {
+                scope(failure)
+                    return tag.expectTagValue!T(name);
+
+                return tag.expectAttribute!T(name);
+            }
+
+            return getInCfg!T(&getImpl, defaultValue);
+        }
+
+        /**
+         * Retrieve a configuration attribute, or the default if the name
+         * could not be found in any configuration source.
+         */
+        T getAttribute(T)(string name, T defaultAttr = T.init)
+        {
+            ensureParsed();
+
+            T getAttributeImpl(Tag tag)
+            {
+                return tag.expectAttribute!T(name);
+            }
+
+            return getInCfg!T(&getAttributeImpl, defaultAttr);
+        }
+
+        /**
+         * Retrieve a configuration value, or the default if the name
+         * could not be found in any configuration source.
+         */
+        T getValue(T)(string name, T defaultValue = T.init)
+        {
+            ensureParsed();
+
+            T getValueImpl(Tag tag)
+            {
+                return tag.expectTagValue!T(name);
+            }
+
+            return getInCfg!T(&getValueImpl, defaultValue);
+        }
+
+        /**
+         * Parse the available configuration sources.
+         */
+        void parse()
+        {
+            ensureParsed();
+        }
+
+        /**
+         * Retrieve the configuration sources, in the same order as they have
+         * been added.
+         */
+        @property string[] sources() { return _sources; }
+
+        /// Check whether the sources have been read.
+        @property bool parsed() const { return _parsed; }
+
+        /// Retrieve a named tag in each configuration.
+        Config getSubConfig(string name)
+        {
+            Tag[] subTags;
+
+            foreach (Tag tag; tags)
+            {
+                Tag st = tag.getTag(name);
+                if (st !is null)
+                    subTags ~= st;
+            }
+
+            Config subCfg = new Config;
+            subCfg.initSubConfig(parsed, subTags);
+            return subCfg;
+        }
+
+    private:
+
+        /**
+         * The configuration sources, each one being either a file path or a
+         * configuration content.
+         */
+        string[] _sources;
+
+        /**
+         * The parsed configurations.
+         */
+        Tag[] _tags;
+
+        /**
+         * `true` when at least one configuration value has been retrieved.
+         */
+        bool _parsed;
+
+        /// Retrieve the list of parsed configurations.
+        @property Tag[] tags()
+        {
+            return _tags.dup;
+        }
+
+        /// Add the root of a newly parsed source.
+        void appendParsed(Tag root)
+        {
+            _tags ~= root;
+        }
+
+        /**
+         * Ensure that all sources have been parsed.
+         */
+        void ensureParsed()
+        {
+            if (!parsed)
+            {
+                foreach(string source; _sources)
+                {
+                    parseOneSource(source);
+                }
+            }
+        }
+
+        /**
+         * Parse one configuration file or content.
+         */
+        void parseOneSource(inout(string) src)
+        {
+            if (exists(src) && isFile(src))
+                appendParsed(parseFile(src));
+            else if (indexOf(src, "\n") >= 0)
+                appendParsed(parseSource(src));
             else
             {
-                const auto comM = matchFirst(content, RX_COMMENT);
-                if (!comM.empty)
-                    line = new Comment(num, content);
-                else
+                immutable string parent = dirName(src);
+
+                if (exists(parent))
                 {
-                    auto kvM = matchFirst(content, RX_KV);
-                    if (!kvM.empty)
+                    if (isDir(parent))
                     {
-                        string k = kvM["key"];
-                        string v = kvM["value"];
-                        line = new KeyValue(num, content, k, v);
+                        if (verbose >= VbLevel.More)
+                            writefln("No config file '%s'", src);
                     }
                     else
                     {
-                        auto secM = matchFirst(content, RX_SECTION);
-                        if (!secM.empty)
-                        {
-                            string name = secM["name"];
-                            Section sec = new Section(num, content, name);
-                            line = sec;
-                            _namedSections[name] = sec;
-                            _currentSection = sec;
-                        }
-                        else
-                            throw new ConfigException(num, content);
+                        if (verbose >= VbLevel.Warn)
+                            writefln("'%s' should be a directory.", parent);
                     }
                 }
             }
-
-            assert(line !is null);
-            assert(_currentSection !is null);
-            _currentSection.addLine(line);
         }
 
-        Section _mainSection;
-        Section[string] _namedSections;
-        Section _currentSection;
-}
-
-
-/// The exception raised when an error is found in a configuration file.
-class ConfigException : Exception
-{
-    enum ErrFmt = "Configuration error at line %d : '%s'.";
-    this(size_t lineNum, string wrongLine)
-    {
-        super(format(ErrFmt, lineNum, wrongLine));
-        _lineNum = lineNum;
-        _wrongLine = wrongLine;
-    }
-
-    /// Retrieve the line number in the configuration file.
-    @property
-    size_t lineNum() const { return _lineNum; }
-
-    /// Retrieve the line with bad content in the configuration file.
-    @property
-    string wrongLine() const { return _wrongLine; }
-
-    private:
-        size_t _lineNum;
-        string _wrongLine;
-}
-
-
-/// Create the configuration directory if needed, and return its path.
-string get_confdir()
-{
-    return get_dir(jn("~", confdir_name));
-}
-
-
-/**
- * Retrieve a configuration or create a default one.
- * Params:
- *     filename        = The name of the configuration file.
- *     defaultContent = The default configuration content, to be used if the
- *                       configuration file does not exist yet.
- *
- */
-Config get_config(string filename, string defaultContent)
-{
-    string config_file = jn(get_confdir(), filename);
-    Config config;
-
-    if (exists(config_file))
-    {
-        if (verbose >= VbLevel.More)
-            writeln("get_config from ", config_file);
-        try
+        /**
+         * Retrieve one configured value : tag value or attribute value.
+         */
+        T getInCfg(T)(T delegate(Tag) getVal, T dflt)
         {
-            config.readFile(config_file);
-        }
-        catch(ConfigException cfx)
-        {
-            if (verbose >= VbLevel.Warn)
-                writeln(cfx.toString());
-            if (verbose >= VbLevel.More)
-                printThChain(cfx);
-        }
-        catch(FileException fex)
-        {
-            if (verbose >= VbLevel.Warn)
+            ensureParsed();
+
+            foreach(Tag tag; tags)
             {
-                immutable string _s = "Could not read config '%s' : %s";
-                writeln(format!_s(config_file, fex.toString()));
-                if (verbose >= VbLevel.More)
-                    printThChain(fex);
+                scope(failure)
+                    continue;
+
+                return getVal(tag);
+            }
+
+            return dflt;
+        }
+
+        /// Initialize a sub-config.
+        void initSubConfig(bool subParsed, Tag[] subTags)
+        {
+            _parsed = subParsed;
+            _tags = subTags.dup;
+        }
+}
+
+
+/// Unit tests
+unittest
+{
+    import std.conv : to;
+    import std.file : deleteme;
+    import std.format : format;
+
+    import dutil : SrcLn, srcln;
+
+    immutable int MISSING_INT = -9876;
+    immutable string MISSING_STRING = "MISSING STRING IN CONFIG";
+
+    void doTest(Config cfg)
+    {
+        // test attributes-or-values
+        template t1(T)
+        {
+            void t1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) name, inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
+            {
+                immutable _f = "\n%sUnexpected %s = '%s'";
+                T v = cfg.get!T(name, dflt);
+                assert(v == exp, _f.format(fl, name, to!string(v)));
+            }
+            void t1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) subName, inout(string) name,
+                    inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
+            {
+                immutable _f = "\n%sUnexpected %s.%s = '%s'";
+                T v = cfg.getSubConfig(subName).get!T(name, dflt);
+                assert(v == exp, _f.format(fl, subName, name, to!string(v)));
             }
         }
-    }
-    else if (defaultContent !is null && defaultContent.length > 0)
-    {
-        config.readString(defaultContent);
-        if (!fake)
+
+        // test attributes
+        template a1(T)
         {
-            try
+            void a1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) name, inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
             {
-                write(config_file, defaultContent);
-                chown(getRealUserAndGroup(), config_file);
+                immutable _f = "\n%sUnexpected %s attribute = '%s'";
+                T v = cfg.getAttribute!T(name, dflt);
+                assert(v == exp, _f.format(fl, name, to!string(v)));
             }
-            catch(Exception ex)
+            void a1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) subName, inout(string) name,
+                    inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
             {
-                if (verbose >= VbLevel.Warn)
-                {
-                    immutable string _s = "Could not write config '%s' : %s";
-                    writeln(format!_s(config_file, ex.toString()));
-                    if (verbose >= VbLevel.More)
-                        printThChain(ex);
-                }
+                immutable _f = "\n%sUnexpected %s.%s attribute = '%s'";
+                T v = cfg.getSubConfig(subName).getAttribute!T(name, dflt);
+                assert(v == exp, _f.format(fl, subName, name, to!string(v)));
             }
         }
+
+        // test values
+        template v1(T)
+        {
+            void v1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) name, inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
+            {
+                immutable _f = "\n%sUnexpected %s value = '%s'";
+                T v = cfg.getValue!T(name, dflt);
+                assert(v == exp, _f.format(fl, name, to!string(v)));
+            }
+            void v1(string file=__FILE__, size_t line=__LINE__)
+                   (inout(string) subName, inout(string) name,
+                    inout(T) dflt, inout(T) exp,
+                    SrcLn fl=srcln(file, line))
+            {
+                immutable _f = "\n%sUnexpected %s.%s value = '%s'";
+                T v = cfg.getSubConfig(subName).getValue!T(name, dflt);
+                assert(v == exp, _f.format(fl, subName, name, to!string(v)));
+            }
+        }
+
+        t1!int("iv0", MISSING_INT, 10);
+        v1!int("iv0", MISSING_INT, 10);
+        t1!string("sv0", MISSING_STRING, "Zero");
+        v1!string("sv0", MISSING_STRING, "Zero");
+
+        t1!int("sub1", "iv1", MISSING_INT, 1);
+        a1!int("sub1", "iv1", MISSING_INT, 1);
+        v1!int("sub1", "iv1", MISSING_INT, 11);
+        t1!int("sub1", "iv2", MISSING_INT, -2);
+        v1!int("sub1", "iv2", MISSING_INT, -2);
+
+        t1!string("sub2", "sv1", MISSING_STRING, "one");
+        a1!string("sub2", "sv1", MISSING_STRING, "eleven");
+        v1!string("sub2", "sv1", MISSING_STRING, "one");
+        t1!string("sub2", "sv2", MISSING_STRING, "two");
+        a1!string("sub2", "sv2", MISSING_STRING, "two");
+        v1!string("sub2", "sv2", MISSING_STRING, MISSING_STRING);
+
+        t1!int("sub3", "iv3", MISSING_INT, 3);
+        a1!int("sub3", "iv3", MISSING_INT, 3);
+        v1!int("sub3", "iv3", MISSING_INT, MISSING_INT);
+        t1!int("sub4", "iv4", MISSING_INT, -4);
+        a1!int("sub4", "iv4", MISSING_INT, MISSING_INT);
+        v1!int("sub4", "iv4", MISSING_INT, -4);
+        t1!string("sub4", "sv3", MISSING_STRING, "three");
+        a1!string("sub4", "sv3", MISSING_STRING, MISSING_STRING);
+        v1!string("sub4", "sv3", MISSING_STRING, "three");
+        t1!string("sub4", "sv4", MISSING_STRING, "four");
+        a1!string("sub4", "sv4", MISSING_STRING, "four");
+        v1!string("sub4", "sv4", MISSING_STRING, MISSING_STRING);
+
+        t1!int("iv5", MISSING_INT, MISSING_INT);
+        v1!int("iv5", MISSING_INT, MISSING_INT);
+        t1!int("sub4", "iv6", MISSING_INT, MISSING_INT);
+        a1!int("sub4", "iv6", MISSING_INT, MISSING_INT);
+        v1!int("sub4", "iv6", MISSING_INT, MISSING_INT);
+        t1!string("sub4", "sv6", MISSING_STRING, MISSING_STRING);
+        a1!string("sub4", "sv6", MISSING_STRING, MISSING_STRING);
+        v1!string("sub4", "sv6", MISSING_STRING, MISSING_STRING);
     }
 
-    return config;
+    immutable string content1 = `
+iv0 10
+# no-sv0
+
+sub1 iv1=1 {
+
+    # comment
+    iv2 -2
 }
 
+sub2 sv2="two" {
+    sv1 "one"
+}
+
+sub3 {
+}
+
+# no-sub4 no-iv4 no-sv3 no-sv4
+`;
+
+immutable string content2 = `
+#no-iv0
+sv0 "Zero"
+
+sub1 {
+    iv1 11   # unused;  no-iv2 either
+}
+
+sub2 sv1="eleven"   # no-sv2
+
+sub3 iv3=3
+
+#comment too
+sub4 sv4="four" {
+    iv4 -4
+    sv3 "three"
+}
+`;
+
+    immutable string file1 = deleteme ~ ".config-unittest-f1.cfg";
+    immutable string file2 = deleteme ~ ".config-unittest-f2.cfg";
+
+    string writeToFile(string fileName, string content)
+    {
+        write(fileName, content);
+        return fileName;
+    }
+
+    void testConfigWithTwoSourceFiles()
+    {
+        Config cfg = new Config;
+        cfg.addSource(writeToFile(file1, content1));
+        cfg.addSource(writeToFile(file2, content2));
+        doTest(cfg);
+    }
+
+    void testConfigWithTwoSourceContents()
+    {
+        Config cfg = new Config;
+        cfg.addSource(content1);
+        cfg.addSource(content2);
+        doTest(cfg);
+    }
+
+    void testConfigWithFileThenContent()
+    {
+        Config cfg = new Config;
+        cfg.addSource(writeToFile(file1, content1));
+        cfg.addSource(content2);
+        doTest(cfg);
+    }
+
+    void testConfigWithContentThenFile()
+    {
+        Config cfg = new Config;
+        cfg.addSource(content1);
+        cfg.addSource(writeToFile(file2, content2));
+        doTest(cfg);
+    }
+
+    testConfigWithTwoSourceFiles;
+    testConfigWithTwoSourceContents;
+    testConfigWithFileThenContent;
+    testConfigWithContentThenFile;
+}
 
 
