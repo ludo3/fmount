@@ -91,8 +91,6 @@ if (isSomeString!S)
  * Params:
  *     S       = A string type.
  *     dev     = A path to a block device.
- *     display = The default displayed string for the device, which is usually
- *               either the name or a filesystem label.
  */
 S dev_detailed_descr(S)(S dev)
 if (isSomeString!S)
@@ -271,8 +269,9 @@ if (isSomeString!S)
 /**
  * Retrieve a blkid value from a device path.
  * Params:
- *     S   = A string type.
- *     dev = A path to a block device.
+ *     S    = A string type.
+ *     dev  = A path to a block device.
+ *     attr = A device attribute name.
  */
 S _get_blkid_attr(S)(S dev, S attr)
 if (isSomeString!S)
@@ -300,7 +299,7 @@ if (isSomeString!S)
  *     S   = A string type.
  *     dev = A path to a block device.
  */
-S dev_parttable_uuid(S)(dev)
+S dev_parttable_uuid(S)(S dev)
 if (isSomeString!S)
 {
     return _get_blkid_attr(dev, "PTUUID");
@@ -358,7 +357,7 @@ if (isSomeString!S)
         linksCat ~= lnks;
     }
 
-    return links;
+    return linksCat.data;
 }
 
 
@@ -369,7 +368,7 @@ if (isSomeString!S)
  *     dev = A path to a block device.
  *     dirs = The directories in which the links should be looked up.
  */
-S dev_link_names(S)(S dev, S[] dirs ...)
+S dev_link_names(S)(S dev, S[] dirs)
 if (isSomeString!S)
 {
     return array(map!(d => bn(d))(dev_link_paths(dev, dirs)));
@@ -382,7 +381,7 @@ if (isSomeString!S)
  *     S   = A string type.
  *     dev = A path to a block device.
  */
-S dev_link_name(S)(dev)
+S dev_link_name(S)(S dev)
 if (isSomeString!S)
 {
     auto links = dev_link_paths(dev, DevDir.Root);
@@ -612,7 +611,7 @@ if (isSomeString!S)
  *     S   = A string type.
  *     dev = A path to a block device.
  */
-def is_fs(S)(dev)
+bool is_fs(S)(S dev)
 if (isSomeString!S)
 {
     immutable S usage = dev_fs_usage(dev);
@@ -700,8 +699,8 @@ class MountedDeviceException : Exception
  * The name is compatible with pmount 0.9.23 .
  *
  * Params:
- *     S       = A string type.
- *     raw_dev = A path to an encrypted block device.
+ *     S          = A string type.
+ *     raw_device = A path to an encrypted block device.
  */
 S get_dm_name(S)(S raw_device)
 if (isSomeString!S)
