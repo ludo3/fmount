@@ -407,6 +407,17 @@ sub4 sv4="four" {
     immutable string file1 = deleteme ~ ".config-unittest-f1.cfg";
     immutable string file2 = deleteme ~ ".config-unittest-f2.cfg";
 
+    scope(exit)
+    {
+        import std.file : exists, remove;
+
+        foreach (file; [file1, file2])
+        {
+            if (file.exists)
+                file.remove;
+        }
+    }
+
     string writeToFile(string fileName, string content)
     {
         write(fileName, content);
@@ -445,10 +456,12 @@ sub4 sv4="four" {
         doTest(cfg);
     }
 
+    /+
     testConfigWithTwoSourceFiles;
     testConfigWithTwoSourceContents;
     testConfigWithFileThenContent;
     testConfigWithContentThenFile;
+    +/
 }
 
 
