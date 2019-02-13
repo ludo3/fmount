@@ -34,7 +34,7 @@ public import constvals : VbLevel;
  * Get the --key-file and --keyfile-size arguments for cryptsetup.
  *
  * Params:
- *     password_file: the path to a file containing the password.
+ *     password_file = the path to a file containing the password.
  *
  * Returns: a string array with `--key-file` and `--keyfile-size` options
  *          for `cryptsetup luksOpen`.
@@ -173,7 +173,6 @@ immutable static string fake_help = "Disable any modification command.";
 /**
  * Print the parsed options and arguments.
  * Params:
- *     opts    = The parsed optional arguments.
  *     args    = The remaining positional arguments.
  */
 void print_args(string[] args)
@@ -263,7 +262,8 @@ void optionHandler(string program_option, string value)
 /**
  * Print the parsed options and arguments to the specified output range.
  * Params:
- *     Output = The output range used to write the options and arguments.
+ *     Output = An output range type
+ *     output = The output range used to write the options and arguments.
  *     args   = The positional arguments.
  */
 void output_args(Output)(Output output, string[] args)
