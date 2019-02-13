@@ -83,8 +83,8 @@ static immutable DeviceCategories = [
 /**
  * Explicitly reject the selection of a category.
  * Params:
- *     T : A string type.
- *     cat : a category to be rejected.
+ *     T   = A string type.
+ *     cat = a category to be rejected.
  *
  * Examples:
  * ---
