@@ -24,6 +24,7 @@ import std.stdio : writeln;
 import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
 import dutil : printThChain;
 
+//TODO replace std.getopt with argsd library
 /**
  * Call `std.getopt.getopt(args, ...)` and print any option-related exception.
  */
