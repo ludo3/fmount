@@ -126,10 +126,10 @@ auto read_password(string dev,
  * Display one warning.
  *
  * Params:
+ *   String     = A string type.
  *   strict     = If `true` then the message is shown on the console, as if
  *                `verbose` was set to `vbmore=3`.
- *   String     = A string type.
- *   messages   = The messages to be shown.
+ *   message    = A message to be shown.
  */
 void show_warnings(String)(bool strict, String message)
 if (isSomeString!String ||
@@ -147,7 +147,7 @@ if (isSomeString!String ||
  *   strict     = If `true` then the message is shown on the console, as if
  *                `verbose` was set to `vbmore=3`.
  *   Strings    = An input range of strings.
- *   messages   = The messages to be shown.
+ *   messages   = Some messages to be shown.
  */
 void show_warnings(Strings)(bool strict, Strings messages)
 if (isInputRange!Strings &&
