@@ -1387,85 +1387,101 @@ unittest
         import std.algorithm.iteration : map;
         import std.array : array, join;
 
-        enum years =
+        enum /+string[] not implemented in CTFE, dmd v2.081.1 +/ Years =
             [ "%Y", "%G" ];
 
-        enum months =
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Months =
             [ "%B", "%m" ];
 
-        enum weeks = [ "%W", "%V" ];
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Weeks =
+            [ "%W", "%V" ];
 
-        enum days =
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Days =
             [ "%j", "%d %A" ];
 
         /+
-        enum years =
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Years =
             [ "%Y", "%EY", "%G", "%C | %y", "%EC | %Ey", "%C | %Oy", "%g" ];
 
-        enum months =
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Months =
             [ "%b", "%h", "%B", "%m", "%Om" ];
 
-        enum weeks = [ "%U", "OU", "%W", "%OW", "%V", "%OV" ];
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Weeks =
+            [ "%U", "OU", "%W", "%OW", "%V", "%OV" ];
 
-        enum days =
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Days =
             [ "%j", "%d", "%Od", "%e", "%Oe", "%a", "%A",
               "%w", "%Ow", "%u", "%Ou"
             ];
         +/
 
         return
-            cartesianProduct(years, months, days)
+            cartesianProduct(Years, Months, Days)
                 .map!(a => [ a.expand ].join(","))
                 .array
             ~
-            cartesianProduct(years, weeks)
+            cartesianProduct(Years, Weeks)
                 .map!(a => [ a.expand ].join(","))
                 .array;
 
     }();
 
-    immutable string[] dateFormats =
-        [ "ISOString", "ISOExtString", "SimpleString" ] ~
-        [ "%x", "%F" ] ~
-        genDateFormats;
+    enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ DateFormats =
+        ([ "ISOString", "ISOExtString", "SimpleString" ] ~
+         [ "%x", "%F" ] ~
+         genDateFormats).idup;
 
-    immutable string[] genTimeFormats =
+    enum /+ string[]  not implemented in CTFE, dmd v2.081.1 +/ genTimeFormats =
     {
         import std.algorithm.setops : cartesianProduct;
         import std.algorithm.iteration : map;
         import std.array : array, join;
-        //enum hours = [ "%H", "%OH", "%I %p", "%OI %p" ];
-        enum hours = [ "%H", "%I %p" ];
+        /+
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Hours =
+            [ "%H", "%OH", "%I %p", "%OI %p" ];
+        +/
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Hours =
+            [ "%H:%M", "%I %p : %M" ];
 
-        //enum minutes = [ "%M", "%OM" ];
-        enum minutes = [ "%M" ];
+        /+
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ minutes =
+            [ "%M", "%OM" ];
+        +/
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Minutes = [];
 
-        //enum seconds = [ "%S", "%OS" ];
-        enum string[] seconds = [];
+        /+
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ seconds =
+            [ "%S", "%OS" ];
+        +/
+        enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ Seconds = [];
 
         return
-            cartesianProduct(hours, minutes)
+            /+
+            cartesianProduct(Hours, Minutes)
                 .map!(a => [ a.expand ].join(","))
                 .array
             ~
-            cartesianProduct(hours, minutes, seconds)
+            cartesianProduct(Hours, Minutes, Seconds)
                 .map!(a => [ a.expand ].join(","))
-                .array;
+                .array
+            +/
+            Hours;
 
     }();
 
-    immutable string[] timeFormats =
+    enum /+ string[]  not implemented in CTFE, dmd v2.081.1 +/ TimeFormats =
         ([ "ISOString", "ISOExtString" ] ~
-         [ "%X", "%R", "%T" ] ~
+         [ "[%X / %R]", "[%R / %T]" ] ~
          genTimeFormats).idup;
 
-    immutable string[] genTimestampFormats =
+    enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/
+         genTimestampFormats =
     {
         import std.algorithm.setops : cartesianProduct;
         import std.algorithm.iteration : map;
         import std.array : array, join;
 
-        string[] fmtsNoTz = cartesianProduct(dateFormats, timeFormats)
+        string[] fmtsNoTz = cartesianProduct(DateFormats, TimeFormats)
                 .map!(a => [ a.expand ].join(" at "))
                 .array;
 
@@ -1479,7 +1495,7 @@ unittest
             return fmtsNoTz.idup;
     }();
 
-    immutable string[] timestampFormats =
+    enum /+ string[] not implemented in CTFE, dmd v2.081.1 +/ TimestampFormats =
         ([ "ISOString", "ISOExtString", "SimpleString" ] ~
          [ "%c", "%Ec" ] ~
          genTimestampFormats).idup;
@@ -1493,7 +1509,7 @@ unittest
     import dateutil : approxNowTime, formatToday;
     import dutil : dbg, from, strToTuple;
 
-    alias SpecAndFormat = typeof(tuple("", dateFormats));
+    alias SpecAndFormat = typeof(tuple("", DateFormats));
     alias DTK = SpecAndFormat.Types[0];
     alias DTV = SpecAndFormat.Types[1];
 
@@ -1522,8 +1538,6 @@ unittest
             }
         }
 
-        dbg.ln("testLogFormat '%s' date %s, time %s, timestamp %s formats",
-               logFmt, lg.dateFormat, lg.timeFormat, lg.timestampFormat);
         immutable line = __LINE__ + 1;
         testLogFormat(lg, srcloc, logFmt,
                       strToTuple!logFmt
@@ -1562,9 +1576,14 @@ unittest
     void testManyFormats(string logFmt, Args...)(Args specAndFormats)
     in
     {
-        static foreach(Arg; Args)
+        import std.traits : Unqual;
+        import std.typecons : isTuple;
+        alias SF = SpecAndFormat;
+        static foreach(a, Arg; Args)
         {
-            static assert(is(Arg : SpecAndFormat));
+            static assert(is(Arg : SF),
+                          "Argument[" ~ to!string(a) ~ "] : " ~
+                          Arg.stringof ~ " instead of " ~ SF.stringof);
         }
     }
     do
@@ -1572,7 +1591,7 @@ unittest
         DTV[DTK] dtFmtsBySpec;
         foreach(i, sf; specAndFormats)
         {
-            dtFmtsBySpec[sf[0]] = sf[1];
+            dtFmtsBySpec[sf[0]] = sf[1].dup;
         }
 
         testManyFmts!logFmt(extractSpecs(logFmt), dtFmtsBySpec);
@@ -1580,14 +1599,10 @@ unittest
 
     static foreach(logFmt; logFormats)
     {
-        testManyFormats!logFmt(tuple("%d", dateFormats),
-                               tuple("%t", timeFormats),
-                               tuple("%n", timestampFormats));
+        testManyFormats!logFmt(tuple("%d", DateFormats),
+                               tuple("%t", TimeFormats),
+                               tuple("%n", TimestampFormats));
     }
 
-    // TODO test many logFormat
-    // TODO test many dateFormat
-    // TODO test many timeFormat
-    // TODO test many timestampFormat
 }
 
