@@ -60,7 +60,17 @@ try_filesystems = ['vfat','msdos','iso9660','ntfs','auto']
  */
 string get_confdir()
 {
-    return get_dir(join_paths("~", confdir_name));
+    string root;
+
+    version(unittest)
+    {
+        import std.file : deleteme;
+        root = deleteme;
+    }
+    else
+        root = "~";
+
+    return get_dir(join_paths(root, confdir_name));
 }
 
 
@@ -96,7 +106,8 @@ string getDfltConfig()
 {
     string[] uid_gid = getRealUserAndGroup().split(":");
 
-    return format(DFLT_CONFIG_FMT, DfltMountRoot)
+    return DFLT_CONFIG_FMT
+           .replace("${DfltMountRoot}", DfltMountRoot)
            .replace("${uid}", uid_gid[0])
            .replace("${gid}", uid_gid[1]);
 }
@@ -106,13 +117,58 @@ string getDfltConfig()
  */
 string get_mountroot()
 {
+    return appcfg.get!string("mountroot");
+}
+
+/// Retrieve the current configuration.
+@property Config appcfg() { return getConfig(get_confdir(), "fmount.conf"); }
+
+
+private Config getConfig(string confdir, string filename)
+{
     // FIXME split configuration into system and user.
-    immutable config_file = jn(get_confdir(), "fmount.conf");
+    immutable config_file = jn(confdir, filename);
+
     auto cp = new Config();
     cp.addSource(config_file);
     // FIXME manage both system and user configuration files.
     cp.addSource(getDfltConfig());
-
-    return cp.get!string("root");
+    return cp;
 }
+
+
+// mountroot test
+unittest
+{
+    assert(get_mountroot() == "/media");
+}
+
+// TODO finish default configuration test
+unittest
+{
+    import osutil : removeIfExists;
+
+    auto cfg = getConfig(get_confdir(), "fmount.dflt.conf");
+
+    auto fs = cfg.getSubConfig("fs");
+
+    assert(fs.get("missingValue", "default for missing value")
+           ==
+           "default for missing value");
+    assert(fs.get("all", "default for missing value")
+           ==
+           "noatime,noexec,nodev",
+           "'fs.all' == " ~ fs.get("all", ""));
+           /+
+    fat "users,dirsync,uid=${uid},gid=${gid},utf8"
+    vfat "users,dirsync,uid=${uid},gid=${gid},utf8"
+    ntfs "users,nls=utf8,uid=${uid},gid=${gid}"
+    iso9660 "users,ro,utf8,unhide"
+    btrfs "users,autodefrag,compress"
+    udf "users,iocharset=utf8"
+    ufs "sync"
+    dflt "sync,dirsync"
+           +/
+}
+
 
