@@ -32,6 +32,14 @@ import sdlang : parseFile, parseSource, SDLangException, Tag;
 class Config
 {
     public:
+        /// Destructor.
+        ~this()
+        {
+            clearParsed();
+            clearTags();
+            clearSources();
+        }
+
         /**
          * Add a configuration source.
          *
@@ -130,6 +138,8 @@ class Config
         /// Retrieve a named tag in each configuration.
         Config getSubConfig(string name)
         {
+            ensureParsed();
+
             Tag[] subTags;
 
             foreach (Tag tag; tags)
@@ -142,6 +152,19 @@ class Config
             Config subCfg = new Config;
             subCfg.initSubConfig(parsed, subTags);
             return subCfg;
+        }
+
+        /**
+         * Load or reload the configuration.
+         *
+         * Note: calling this method from
+         * subconfigurations will result in unexpected behavior.
+         */
+        void reload()
+        {
+            clearParsed();
+            clearTags();
+            ensureParsed();
         }
 
     private:
@@ -240,6 +263,24 @@ class Config
         {
             _parsed = subParsed;
             _tags = subTags.dup;
+        }
+
+        void clearParsed()
+        {
+            _parsed = false;
+        }
+
+        void clearTags()
+        {
+            foreach (tag; _tags)
+                destroy(tag);
+
+            _tags.length = 0;
+        }
+
+        void clearSources()
+        {
+            _sources.length = 0;
         }
 }
 
@@ -456,12 +497,55 @@ sub4 sv4="four" {
         doTest(cfg);
     }
 
-    /+
-    testConfigWithTwoSourceFiles;
-    testConfigWithTwoSourceContents;
-    testConfigWithFileThenContent;
-    testConfigWithContentThenFile;
-    +/
 }
 
+
+// default configuration test: missing configuration file, missing subconfig.
+unittest
+{
+    import osutil : jn, removeIfExists;
+    import std.file : deleteme, write;
+
+    immutable config_file = jn(deleteme, "app.dfltSubCfg.conf");
+    auto cfg = new Config();
+
+    enum DFLT_CONFIG = `
+    stringConf "stringValue"
+
+    severalData {
+        data1 "Español"
+        data2 "English"
+        data3 "Français"
+    }
+    `;
+
+    void doTest()
+    {
+        auto severalData = cfg.getSubConfig("severalData");
+
+        assert(severalData.get("missingValue", "default for missing value")
+               ==
+               "default for missing value");
+        assert(severalData.get("data1", "default for missing value")
+               ==
+               "Español",
+               "'severalData.data1' == " ~ severalData.get("data1", ""));
+    }
+
+    cfg.addSource(config_file);
+    cfg.addSource(DFLT_CONFIG);
+
+    // Missing configuration file
+    doTest();
+
+    scope(exit)
+        removeIfExists(config_file);
+
+    write(config_file, `stringConf "stringValue"`);
+    cfg.reload();
+
+    // Missing subconfig in configuration file
+    doTest();
+
+}
 
