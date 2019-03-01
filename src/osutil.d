@@ -24,6 +24,7 @@ import std.path : dirSeparator, expandTilde, pathSeparator;
 import std.process : environment, execute, executeShell, ProcessException,
                      thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
+import std.regex : Regex, regex, split;
 import std.stdio : File, writeln;
 import std.string : format, indexOf, join, split, tr;
 import std.traits : isSomeString, Unqual;
@@ -115,6 +116,8 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
 }
 
 
+private Regex!char spaces = regex(`\s+`);
+
 /**
  * Retrieve a current effective/filesystem/real/saved user and group pair of the
  * running process.
@@ -127,10 +130,12 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
  */
 private string getSomeUserAndGroup(string fmt)
 {
-    immutable usergroup =
-        runCommand(format!"ps --no-headers -o%s %d"(fmt, thisProcessID));
+    import std.string : strip;
 
-    immutable arr = usergroup.split(" ");
+    immutable usergroup =
+        runCommand(format!"ps --no-headers -n -o%s %d"(fmt, thisProcessID));
+
+    immutable arr = usergroup.strip.split(spaces).idup;
 
     static bool isFirstCall(inout(string) fmt)
     {
@@ -226,6 +231,40 @@ string getRealUserAndGroup()
     return getSomeUserAndGroup("ruser,rgroup");
 }
 
+unittest
+{
+    import std.algorithm.iteration : filter;
+    import std.array : array, split;
+    import std.format : _f = format;
+    import std.process : env = environment;
+    import std.string : join;
+
+    string expectedUser = env.get("USER", "user");
+    string passwdLine =
+    {
+        File passwd = File("/etc/passwd");
+        string line;
+        while ((line = passwd.readln()) !is null)
+        {
+            if (line[0 .. expectedUser.length] == expectedUser
+                && line[expectedUser.length] == ':')
+            {
+                return line;
+            }
+        }
+
+        return line;
+    }();
+
+    // expectedUserGroup is usually 1000:1000 for a single user environment.
+    string expectedUserGroup = passwdLine.split(":")[2..4].join(":");
+
+    string actual = getRealUserAndGroup();
+    // FIXME get group through /etc/passwd and /etc/group
+    assert(actual == expectedUserGroup,
+           _f!"Real user and group '%s' instead of '%s'.\nenv is:%(\n  %s: %)"
+           (actual, expectedUserGroup, env.toAA));
+}
 
 /**
  * Replace the owner of a file or directory.
