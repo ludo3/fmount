@@ -1231,6 +1231,7 @@ unittest
                         approxNow(1.seconds, "%Y-%m-%dT%H:%M:%S"),
                         " : One(1) formatted line.");
     }
+
 }
 
 
@@ -1259,6 +1260,8 @@ unittest
     auto lg = ffLogger(deleteme ~ name);
     scope(exit)
         removeIfExists(deleteme ~ name);
+
+    stderr.writeln(srcinfo, " logFormat tests started.");
 
     // Test default formats.
     assertEquals(lg.logFormat, "@%f(%l) %n : %s", "default logFormat");
@@ -1604,5 +1607,6 @@ unittest
                                tuple("%n", TimestampFormats));
     }
 
+    stderr.writeln(srcinfo, " logFormat tests finished.");
 }
 
