@@ -139,7 +139,7 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
         if (verbose >= VbLevel.More)
             printThChain(ex);
         string descr = dev_descr(disk, dev_display(disk));
-        show_warnings(true, descr ~ ": " ~ ex.toString());
+        show_warnings!(VbLevel.None)(descr ~ ": " ~ ex.toString());
     }
 }
 

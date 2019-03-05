@@ -23,7 +23,7 @@ import std.conv : text;
 import std.exception : basicExceptionCtors;
 import std.format : format;
 import std.range.primitives : ElementType, isInputRange;
-import std.stdio : writeln;
+import std.stdio : stderr, stdout, writeln;
 import std.string : fromStringz, toStringz;
 import std.traits : isSomeChar, isSomeString;
 import unistd = core.sys.linux.unistd;
@@ -126,17 +126,36 @@ auto read_password(string dev,
  * Display one warning.
  *
  * Params:
+ *   minVbLevel = The verbosity level for which the warning is requested.
+ *                The message is shown only when `verbose` was set to that
+ *                level.
  *   String     = A string type.
- *   strict     = If `true` then the message is shown on the console, as if
- *                `verbose` was set to `vbmore=3`.
  *   message    = A message to be shown.
  */
-void show_warnings(String)(bool strict, String message)
+void show_warnings(VbLevel minVbLevel, String)(String message)
 if (isSomeString!String ||
     (isInputRange!String &&
      isSomeChar!(ElementType!String)))
 {
-    show_warnings(strict, [message]);
+    show_warnings(minVbLevel, [message]);
+}
+
+/**
+ * Display one warning.
+ *
+ * Params:
+ *   String     = A string type.
+ *   minVbLevel = The verbosity level for which the warning is requested.
+ *                The message is shown only when `verbose` was set to that
+ *                level.
+ *   message    = A message to be shown.
+ */
+void show_warnings(String)(VbLevel minVbLevel, String message)
+if (isSomeString!String ||
+    (isInputRange!String &&
+     isSomeChar!(ElementType!String)))
+{
+    show_warnings(minVbLevel, [message]);
 }
 
 
@@ -144,17 +163,36 @@ if (isSomeString!String ||
  * Display one or more warning(s).
  *
  * Params:
- *   strict     = If `true` then the message is shown on the console, as if
- *                `verbose` was set to `vbmore=3`.
+ *   minVbLevel = The verbosity level for which the warning is requested.
+ *                The message is shown only when `verbose` was set to that
+ *                level.
  *   Strings    = An input range of strings.
  *   messages   = Some messages to be shown.
  */
-void show_warnings(Strings)(bool strict, Strings messages)
+void show_warnings(VbLevel minVbLevel, Strings)(Strings messages)
 if (isInputRange!Strings &&
     (isInputRange!(ElementType!Strings) &&
      isSomeChar!(ElementType!(ElementType!Strings))))
 {
-    if (strict || verbose >= VbLevel.More)
+    show_warnings(minVbLevel, messages);
+}
+
+/**
+ * Display one or more warning(s).
+ *
+ * Params:
+ *   Strings    = An input range of strings.
+ *   minVbLevel = The verbosity level for which the warning is requested.
+ *                The message is shown only when `verbose` was set to that
+ *                level.
+ *   messages   = Some messages to be shown.
+ */
+void show_warnings(Strings)(VbLevel minVbLevel, Strings messages)
+if (isInputRange!Strings &&
+    (isInputRange!(ElementType!Strings) &&
+     isSomeChar!(ElementType!(ElementType!Strings))))
+{
+    if (verbose >= minVbLevel)
         show_warning(messages.join("\n"));
 }
 
@@ -168,7 +206,162 @@ if (isSomeString!String ||
      isSomeChar!(ElementType!String)))
 {
     if (verbose >= VbLevel.Warn)
-        writeln(message);
+        stderr.writeln(message);
 }
 
+private enum vbPrefix(VbLevel) = "";
+private enum vbPrefix(VbLevel : VbLevel.None) = "Error: ";
+private enum vbPrefix(VbLevel : VbLevel.Warn) = "Warning: ";
+private enum vbPrefix(VbLevel : VbLevel.More) = "Trace: ";
+private enum vbPrefix(VbLevel : VbLevel.Dbug) = "Debug: ";
+
+/**
+   This template provides the output functions with the `VbLevel` encoded in the
+   function name.
+
+   For further information see the the two vbImpl functions defined inside.
+
+   The aliases following this template create the public names of these output
+   functions.
+*/
+template vbFuns(VbLevel vl)
+{
+    static if (vl == VbLevel.Info)
+        alias output = stdout;
+    else
+        alias output = stderr;
+
+    /**
+       This function outputs data to the standard error, or to the standard
+       output for the `info` level, if the `verbose` program argument is at
+       least `vl`.
+
+       Params:
+         A    = The argument types.
+         args = The data that should be logged.
+
+       Example:
+       --------------------
+       error(486, "is an integer number");
+       warn(486, "is an integer number");
+       info(486, "is an integer number");
+       trace(486, "is an integer number");
+       debug(486, "is an integer number");
+       --------------------
+    */
+    void vbImpl(A...)(lazy A args)
+        if (args.length == 0 || (args.length > 0 && !is(A[0] : bool)))
+    {
+        if (verbose >= vl)
+        {
+            output.write(vbPrefix!vl);
+            output.writeln(args);
+        }
+    }
+
+    /**
+       This function outputs data to the standard error, or to the standard
+       output for the `info` level, if the `verbose` program argument is at
+       least `vl`, and if the additional condition is `true`.
+
+       Params:
+         A    = The argument types.
+         condition = The condition must be `true` for the data to be written.
+         args = The data that should be logged.
+
+       Example:
+       --------------------
+       error(true, 486, "is an integer number");
+       warn(true, 789, "is an integer number");
+       info(false, 123, "is an integer number");
+       trace(false, 543, "is an integer number");
+       debug(false, 876, "is an integer number");
+       --------------------
+    */
+    void vbImpl(A...)(lazy bool condition, lazy A args)
+    {
+        if (verbose >= vl && condition)
+        {
+            output.write(vbPrefix!vl);
+            output.writeln(args);
+        }
+    }
+
+    /**
+       This function outputs data in a `printf`-style manner.
+
+       The data are put to the standard error, or to the standard
+       output for the `info` level, if the `verbose` program argument is at
+       least `vl`.
+
+       Params:
+         A    = The argument types.
+         args = The data that should be logged.
+
+       Example:
+       --------------------
+       errorf("%d is an integer number", 486);
+       warnf("%d is an integer number", 789);
+       infof("%d is an integer number", 123);
+       tracef("%d is an integer number", 543);
+       debugf("%d is an integer number", 876);
+       --------------------
+    */
+    void vbImplf(A...)(lazy string msg, lazy A args)
+    {
+        if (verbose >= vl)
+        {
+            output.write(vbPrefix!vl);
+            output.writefln(msg, args);
+        }
+    }
+
+    /**
+       This function outputs data in a `printf`-style manner.
+
+       The data are put to the standard error, or to the standard
+       output for the `info` level, if the `verbose` program argument is at
+       least `vl`, and if the additional condition is `true`.
+
+       Params:
+         A    = The argument types.
+         condition = The condition must be `true` for the data to be written.
+         args = The data that should be logged.
+
+       Example:
+       --------------------
+       errorf(true, "%d is an integer number", 486);
+       warnf(true, "%d is an integer number", 789);
+       infof(false, "%d is an integer number", 123);
+       tracef(false, "%d is an integer number", 543);
+       debugf(false, "%d is an integer number", 876);
+       --------------------
+    */
+    void vbImplf(A...)(lazy bool condition, lazy string msg, lazy A args)
+    {
+        if (verbose >= vl && condition)
+        {
+            output.write(vbPrefix!vl);
+            output.writefln(msg, args);
+        }
+    }
+
+}
+
+/// Ditto
+alias trace = vbFuns!(VbLevel.More).vbImpl;
+/// Ditto
+alias tracef = vbFuns!(VbLevel.More).vbImplf;
+/// Ditto
+alias info = vbFuns!(VbLevel.Info).vbImpl;
+/// Ditto
+alias infof = vbFuns!(VbLevel.Info).vbImplf;
+/// Ditto
+alias warning = vbFuns!(VbLevel.Warn).vbImpl;
+/// Ditto
+alias warningf = vbFuns!(VbLevel.Warn).vbImplf;
+/// Ditto
+alias error = vbFuns!(VbLevel.None).vbImpl;
+/// Ditto
+alias errorf = vbFuns!(VbLevel.None).vbImplf;
 
