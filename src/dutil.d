@@ -585,6 +585,9 @@ unittest
 
 
 version(unittest)
+    debug=1;
+
+debug
 {
     import std.stdio : stderr;
 
@@ -654,7 +657,7 @@ else
     struct Dbg
     {
         /// `true` when run from unit tests.
-        enum bool enabled;
+        enum bool enabled = false;
 
         /// Constructor with the caller's file and line.
         this(string file_, size_t line_) @safe pure
@@ -677,7 +680,7 @@ else
             @property string prefix() const @safe pure { return ""; }
 
             /// Write a formatted debug information on the standard error file.
-            ref Dbg ln(alias fmt)(lazy Args args) @trusted
+            ref Dbg ln(alias fmt, Args...)(lazy Args args) @trusted
             if (isSomeString!(typeof(fmt)))
             {
                 return ln(args);
@@ -687,6 +690,8 @@ else
             ref Dbg ln(S, Args...)(lazy S fmt, lazy Args args) @trusted
             if (isSomeString!(typeof(fmt)))
             {
+                unused(fmt);
+                unused(args);
                 return this;
             }
     }
@@ -1173,6 +1178,19 @@ if (Args.length >= 2)
         unused(arg);
 }
 
+/**
+ * Make sure that an empty list of  arguments is indeed used by the
+ * compiler.
+ *
+ * Params:
+ *   Args = An empty sequence of types.
+ *   args = An empty sequence of values.
+ */
+void unused()
+{
+    // nothing to do
+}
+
 ///
 unittest
 {
@@ -1181,6 +1199,10 @@ unittest
 
     f1(3);
     f2(7, "seven");
+
+    void f0(T...)(T args) { unused(args); }
+    f0();
+    f0(1,2,3);
 }
 
 
