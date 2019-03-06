@@ -204,4 +204,28 @@ Therefore, it is recommended to allow only selected users to run fmount,
 and use super or sudo if possible.
 TXT";
 
+/// Switch (enable or disable) some values
+struct With(string InstanceName)
+{
+    /// The instance name.
+    enum string Name = InstanceName;
+
+    /// The instance type.
+    alias Type = With!Name;
+
+    /// Disabling value.
+    enum Type No = Type(false);
+
+    /// Enabling value.
+    enum Type Yes = Type(true);
+
+    /// Constructor.
+    this(bool boo)
+    {
+        _value = boo;
+    }
+
+    private bool _value;
+}
+
 
