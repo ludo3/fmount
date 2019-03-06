@@ -772,35 +772,10 @@ class FormattedFileLogger : FileLogger
      */
     string getContent(size_t nbLines=1)()
     {
-        import std.algorithm : max;
+        import fileutil : getText;
 
         if (file.isOpen)
-        {
-            file.lock();
-            scope(exit)
-                file.unlock();
-
-            ulong pos = file.tell();
-            ulong sz = file.size();
-            file.rewind;
-
-            scope(exit)
-            {
-                // make sure all read/write modes are correctly handled.
-                file.rewind();
-                file.seek(pos);
-            }
-
-            static if (nbLines == 0)
-                enum RG = "0..$";
-            else
-                enum RG = "max(0, $-nbLines) .. $";
-
-            return file.byLineCopy()
-                       .array()
-                       .extract(nbLines)
-                       .join("\n");
-        }
+            return file.getText!nbLines();
         else if (_logger.length > 0)
         {
             foreach(name; _logger.names)
@@ -816,15 +791,6 @@ class FormattedFileLogger : FileLogger
         return "";
     }
 
-}
-
-private S[] extract(S)(S[] data, size_t nb)
-if (isSomeString!S)
-{
-    if (nb == 0 || nb >= data.length)
-        return data;
-    else
-        return data[$-nb .. $];
 }
 
 /// Instanciate a `FormattedFileLogger` with an opened file and minimum level.
@@ -1125,6 +1091,7 @@ unittest
         // write some lines to stdout
         {
             auto stdout0 = bkv(stdout);
+            unused(stdout0);
             stdout = File(deleteme ~ ".stdout.1", "a+");
             auto w = ffLogger(stdout);
             w.logf("LogWriter to stdout Int(%d) Float(%f)", 20, 1.9);
