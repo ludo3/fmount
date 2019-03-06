@@ -24,10 +24,12 @@ module argsutil;
 import std.conv : text;
 import std.file : getSize;
 import std.getopt : Option;
+import std.range.primitives : isOutputRange;
 import std.stdio;
 import std.string;
 
 public import constvals : VbLevel;
+import ui : tracef;
 
 
 /**
@@ -177,8 +179,8 @@ immutable static string fake_help = "Disable any modification command.";
  */
 void print_args(string[] args)
 {
-    import std.stdio : stdout;
-    output_args(stdout.lockingTextWriter(), args);
+    import std.stdio : stderr;
+    output_args!(tracef, stderr)(args);
 }
 
 
@@ -262,29 +264,25 @@ void optionHandler(string program_option, string value)
 /**
  * Print the parsed options and arguments to the specified output range.
  * Params:
- *     Output = An output range type
- *     output = The output range used to write the options and arguments.
+ *     uifun  = One of the ui `infof`, `tracef`, ... functions.
+ *     output = An output range used to write the options and arguments.
  *     args   = The positional arguments.
  */
-void output_args(Output)(Output output, string[] args)
+void output_args(alias uifun, alias output)(string[] args)
+if (is(typeof(output) == typeof(stderr)))
 {
-    import std.format : formattedWrite;
-    string fmt = "%s is '%s'.\n";
+    enum fmt = "%s is '%s'.\n";
 
-    output.formattedWrite(format!"%s Options:\n"(args[0]));
-    output.formattedWrite(format(fmt, "passphrase", passphrase_file));
-    output.formattedWrite(format(fmt, "random_file", random_file));
-    output.formattedWrite(format(fmt, "exec_dirs", exec_dirs));
-    output.formattedWrite(format(fmt, "options", options));
-    output.formattedWrite(format(fmt, "verbose", verbose));
-    output.formattedWrite(format(fmt, "fake", fake));
+    uifun("%s Options:\n", output, args[0]);
+    uifun(fmt, output, "passphrase", passphrase_file);
+    uifun(fmt, output, "random_file", random_file);
+    uifun(fmt, output, "exec_dirs", exec_dirs);
+    uifun(fmt, output, "options", options);
+    uifun(fmt, output, "verbose", verbose);
+    uifun(fmt, output, "fake", fake);
 
     if (args.length >= 2)
-    {
-        output.formattedWrite("Positional arguments:\n    %s\n",
-                              join(args[1..args.length], "\n    "));
-
-    }
+        uifun("Positional arguments:\n    %(%s\n    %)\n", output, args[1..$]);
 }
 
 

@@ -21,17 +21,23 @@ module ui;
 import std.array : join;
 import std.conv : text;
 import std.exception : basicExceptionCtors;
-import std.format : format;
-import std.range.primitives : ElementType, isInputRange;
+import std.format : format, formattedWrite;
+import std.range.primitives : ElementType, isInputRange, isOutputRange;
 import std.stdio : stderr, stdout, writeln;
 import std.string : fromStringz, toStringz;
 import std.traits : isSomeChar, isSomeString;
 import unistd = core.sys.linux.unistd;
 
 import argsutil : passphrase_file, VbLevel, verbose;
+import constvals : With;
 import dev : dev_descr, dev_display, is_encrypted;
-import file : File;
+import dutil : unused;
 import tempfile : NamedTemporaryFile;
+
+version(unittest)
+{
+    import std.file : deleteme;
+}
 
 
 private string _getpass(const string prompt)
@@ -102,6 +108,8 @@ class PasswordException : Exception
 auto read_password(string dev,
                    bool confirm_for_encryption=false)
 {
+    import file : File;
+
     string descr = dev_descr(dev, dev_display(dev));
 
     if (confirm_for_encryption || is_encrypted(dev))
@@ -193,27 +201,46 @@ if (isInputRange!Strings &&
      isSomeChar!(ElementType!(ElementType!Strings))))
 {
     if (verbose >= minVbLevel)
-        show_warning(messages.join("\n"));
+        warning(messages.join("\n"));
 }
 
 
-/**
- * Display a warning on the console.
- */
-void show_warning(String)(String message)
-if (isSomeString!String ||
-    (isInputRange!String &&
-     isSomeChar!(ElementType!String)))
+private template vbPrefix(VbLevel vb)
 {
-    if (verbose >= VbLevel.Warn)
-        stderr.writeln(message);
+    enum vbPrefix = "";
 }
 
-private enum vbPrefix(VbLevel) = "";
-private enum vbPrefix(VbLevel : VbLevel.None) = "Error: ";
-private enum vbPrefix(VbLevel : VbLevel.Warn) = "Warning: ";
-private enum vbPrefix(VbLevel : VbLevel.More) = "Trace: ";
-private enum vbPrefix(VbLevel : VbLevel.Dbug) = "Debug: ";
+private template vbPrefix(VbLevel vb : VbLevel.None)
+{
+    enum vbPrefix = "Error: ";
+}
+
+private template vbPrefix(VbLevel vb : VbLevel.Info)
+{
+    enum vbPrefix = "";
+}
+
+private template vbPrefix(VbLevel vb : VbLevel.Warn)
+{
+    enum vbPrefix = "Warning: ";
+}
+
+private template vbPrefix(VbLevel vb : VbLevel.More)
+{
+    enum vbPrefix = "Trace: ";
+}
+
+private template vbPrefix(VbLevel vb : VbLevel.Dbug)
+{
+    enum vbPrefix = "Debug: ";
+}
+
+
+/// Enable (`WithPrefix.Yes` or disable (`WithPrefix.No`) `vl` prefixes.
+alias WithPrefix = With!"Prefix";
+
+/// Shorthand for `isOutputRange!(T, char)` .
+enum bool isOutRChar(T) = isOutputRange!(T, char);
 
 /**
    This template provides the output functions with the `VbLevel` encoded in the
@@ -226,10 +253,13 @@ private enum vbPrefix(VbLevel : VbLevel.Dbug) = "Debug: ";
 */
 template vbFuns(VbLevel vl)
 {
+    import std.stdio : File;
+
     static if (vl == VbLevel.Info)
-        alias output = stdout;
+        alias dfltOut = stdout;
     else
-        alias output = stderr;
+        alias dfltOut = stderr;
+
 
     /**
        This function outputs data to the standard error, or to the standard
@@ -237,8 +267,10 @@ template vbFuns(VbLevel vl)
        least `vl`.
 
        Params:
-         A    = The argument types.
-         args = The data that should be logged.
+         prefix = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A      = The argument types.
+         output = The file to which the data are written.
+         args   = The data that should be logged.
 
        Example:
        --------------------
@@ -249,15 +281,74 @@ template vbFuns(VbLevel vl)
        debug(486, "is an integer number");
        --------------------
     */
-    void vbImpl(A...)(lazy A args)
-        if (args.length == 0 || (args.length > 0 && !is(A[0] : bool)))
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+               (File output, lazy A args)
+    if (args.length > 0 && !is(A[0] == bool))
     {
         if (verbose >= vl)
         {
-            output.write(vbPrefix!vl);
-            output.writeln(args);
+            auto writer = output.lockingTextWriter();
+            // FIXME should be possible to remove need for typeof(writer)
+            doVbImplw!(typeof(writer), prefix, A)(writer, args);
         }
     }
+
+    /// Ditto
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)(lazy A args)
+    if (args.length > 0 && !is(A[0] == bool) && !is(A[0] == File) &&
+        !isOutRChar!(A[0]))
+    {
+        if (verbose >= vl)
+        {
+            auto writer = dfltOut.lockingTextWriter();
+            // FIXME should be possible to remove need for typeof(writer)
+            doVbImplw!(typeof(writer), prefix, A)(writer, args);
+        }
+    }
+
+    /**
+       This function outputs data to an output range, if the `verbose`
+       program argument is at least `vl`.
+
+       Params:
+         W         = The type of the output range receiving the data.
+         prefix = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A      = The argument types.
+         writer    = The output range receiving the data.
+         args   = The data that should be logged.
+
+       Example:
+       --------------------
+       error(486, "is an integer number");
+       warn(486, "is an integer number");
+       info(486, "is an integer number");
+       trace(486, "is an integer number");
+       debug(486, "is an integer number");
+       --------------------
+    */
+    void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
+                (W writer, lazy A args)
+    if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
+        isOutRChar!W)
+    {
+        if (verbose >= vl)
+            doVbImplw!(W, prefix, A)(writer, args);
+    }
+
+    // No verbose test, done before calling this function.
+    private void doVbImplw(W, WithPrefix prefix, A...)
+                          (W writer, lazy A args)
+    if (args.length > 0 && !is(A[0] == bool) && isOutRChar!W)
+    {
+        if (prefix == WithPrefix.Yes)
+            formattedWrite!"%s"(writer, vbPrefix!vl);
+
+        static foreach(arg; args)
+            formattedWrite!"%s"(writer, arg);
+
+        writer.put('\n');
+    }
+
 
     /**
        This function outputs data to the standard error, or to the standard
@@ -265,9 +356,11 @@ template vbFuns(VbLevel vl)
        least `vl`, and if the additional condition is `true`.
 
        Params:
-         A    = The argument types.
+         prefix    = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A         = The argument types.
+         output    = The file to which the data are written.
          condition = The condition must be `true` for the data to be written.
-         args = The data that should be logged.
+         args      = The data that should be logged.
 
        Example:
        --------------------
@@ -278,13 +371,57 @@ template vbFuns(VbLevel vl)
        debug(false, 876, "is an integer number");
        --------------------
     */
-    void vbImpl(A...)(lazy bool condition, lazy A args)
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+               (File output, lazy bool condition, lazy A args)
     {
         if (verbose >= vl && condition)
         {
-            output.write(vbPrefix!vl);
-            output.writeln(args);
+            auto writer = output.lockingTextWriter();
+            // FIXME should be possible to remove need for typeof(writer)
+            doVbImplw!(typeof(writer), prefix, A)(writer, args);        }
+    }
+
+    /// Ditto
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+               (lazy bool condition, lazy A args)
+    {
+        if (verbose >= vl && condition)
+        {
+            auto writer = dfltOut.lockingTextWriter();
+            // FIXME should be possible to remove need for typeof(writer)
+            doVbImplw!(typeof(writer), prefix, A)(writer, args);
         }
+    }
+
+    /**
+       This function outputs data to an output range, if the `verbose`
+       program argument is at least `vl`, and if the additional condition is
+       `true`.
+
+       Params:
+         W         = The type of the output range receiving the data.
+         prefix    = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A         = The argument types.
+         writer    = The output range receiving the data.
+         condition = The condition must be `true` for the data to be written.
+         args      = The data that should be logged.
+
+       Example:
+       --------------------
+       error(486, "is an integer number");
+       warn(486, "is an integer number");
+       info(486, "is an integer number");
+       trace(486, "is an integer number");
+       debug(486, "is an integer number");
+       --------------------
+    */
+    void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
+                (W writer, lazy bool condition, lazy A args)
+    if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
+        isOutRChar!W)
+    {
+        if (verbose >= vl && condition)
+            doVbImplw!(W, prefix, A)(writer, args);
     }
 
     /**
@@ -295,8 +432,11 @@ template vbFuns(VbLevel vl)
        least `vl`.
 
        Params:
-         A    = The argument types.
-         args = The data that should be logged.
+         prefix = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A      = The argument types.
+         msg    = The data format.
+         output = The file to which the data are written.
+         args   = The data that should be logged.
 
        Example:
        --------------------
@@ -307,14 +447,72 @@ template vbFuns(VbLevel vl)
        debugf("%d is an integer number", 876);
        --------------------
     */
-    void vbImplf(A...)(lazy string msg, lazy A args)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+                (lazy string msg, File output, lazy A args)
     {
         if (verbose >= vl)
         {
-            output.write(vbPrefix!vl);
-            output.writefln(msg, args);
+            auto writer = output.lockingTextWriter();
+            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
         }
     }
+
+    /// Ditto
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+                (lazy string msg, lazy A args)
+    if (A.length > 0 && !is(A[0] == File) && !is(A[0] == bool))
+    {
+        if (verbose >= vl)
+        {
+            auto writer = dfltOut.lockingTextWriter();
+            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+        }
+    }
+
+
+    /**
+       This function outputs data in a `printf`-style manner to an output
+       writer, if the `verbose` program argument is at least `vl`.
+
+       Params:
+         W         = The type of the output range receiving the data.
+         prefix = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A      = The argument types.
+         msg    = The data format.
+         writer    = The output range receiving the data.
+         args   = The data that should be logged.
+
+       Example:
+       --------------------
+       error(486, "is an integer number");
+       warn(486, "is an integer number");
+       info(486, "is an integer number");
+       trace(486, "is an integer number");
+       debug(486, "is an integer number");
+       --------------------
+    */
+    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
+                 (lazy string msg, W writer, lazy A args)
+    if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
+        isOutRChar!W && !is(W == typeof(dfltOut)))
+    {
+        if (verbose >= vl)
+            doVbImplwf!(W, prefix, A)(msg, writer, args);
+    }
+
+    // No verbose test, done before calling this function.
+    private void doVbImplwf(W, WithPrefix prefix, A...)
+                           (lazy string msg, W writer, lazy A args)
+    if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
+        isOutRChar!W && !is(W == typeof(dfltOut)))
+    {
+        if (prefix == WithPrefix.Yes)
+            formattedWrite!"%s"(writer, vbPrefix!vl);
+
+        formattedWrite(writer, msg, args);
+        writer.put('\n');
+    }
+
 
     /**
        This function outputs data in a `printf`-style manner.
@@ -324,9 +522,12 @@ template vbFuns(VbLevel vl)
        least `vl`, and if the additional condition is `true`.
 
        Params:
+         prefix = `WithPrefix.No` if the `vl` prefix must be disabled.
          A    = The argument types.
          condition = The condition must be `true` for the data to be written.
-         args = The data that should be logged.
+         msg    = The data format.
+         output = The file to which the data are written.
+         args   = The data that should be logged.
 
        Example:
        --------------------
@@ -337,23 +538,71 @@ template vbFuns(VbLevel vl)
        debugf(false, "%d is an integer number", 876);
        --------------------
     */
-    void vbImplf(A...)(lazy bool condition, lazy string msg, lazy A args)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+                (lazy bool condition, lazy string msg, File output, lazy A args)
     {
         if (verbose >= vl && condition)
         {
-            output.write(vbPrefix!vl);
-            output.writefln(msg, args);
+            auto writer = output.lockingTextWriter();
+            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
         }
     }
 
+    /// Ditto
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+                (lazy bool condition, lazy string msg, lazy A args)
+    if (A.length > 0 && !is(A[0] == File))
+    {
+        if (verbose >= vl && condition)
+        {
+            auto writer = dfltOut.lockingTextWriter();
+            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+        }
+    }
+
+    /**
+       This function outputs data in a `printf`-style manner to an output
+       writer, if the `verbose` program argument is at least `vl`, and if
+       the additional condition is `true`.
+
+       Params:
+         W         = The type of the output range receiving the data.
+         prefix    = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A         = The argument types.
+         condition = The condition must be `true` for the data to be written.
+         msg       = The data format.
+         writer    = The output range receiving the data.
+         args      = The data that should be logged.
+
+       Example:
+       --------------------
+       error(486, "is an integer number");
+       warn(486, "is an integer number");
+       info(486, "is an integer number");
+       trace(486, "is an integer number");
+       debug(486, "is an integer number");
+       --------------------
+    */
+    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
+                 (lazy bool condition, lazy string msg, W writer, lazy A args)
+    if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
+        isOutRChar!W && !is(W == typeof(dfltOut)))
+    {
+        if (verbose >= vl && condition)
+            doVbImplwf!(W, prefix, A)(msg, writer, args);
+    }
 }
 
+/// Ditto
+alias dbug = vbFuns!(VbLevel.Dbug).vbImpl;
+/// Ditto
+alias dbugf = vbFuns!(VbLevel.Dbug).vbImplf;
 /// Ditto
 alias trace = vbFuns!(VbLevel.More).vbImpl;
 /// Ditto
 alias tracef = vbFuns!(VbLevel.More).vbImplf;
 /// Ditto
-alias info = vbFuns!(VbLevel.Info).vbImpl;
+alias info_ = vbFuns!(VbLevel.Info).vbImpl;
 /// Ditto
 alias infof = vbFuns!(VbLevel.Info).vbImplf;
 /// Ditto
@@ -364,4 +613,286 @@ alias warningf = vbFuns!(VbLevel.Warn).vbImplf;
 alias error = vbFuns!(VbLevel.None).vbImpl;
 /// Ditto
 alias errorf = vbFuns!(VbLevel.None).vbImplf;
+
+/// Ditto
+alias dbugw = vbFuns!(VbLevel.Dbug).vbImplw;
+/// Ditto
+alias dbugwf = vbFuns!(VbLevel.Dbug).vbImplwf;
+/// Ditto
+alias tracew = vbFuns!(VbLevel.More).vbImplw;
+/// Ditto
+alias tracewf = vbFuns!(VbLevel.More).vbImplwf;
+/// Ditto
+alias infow = vbFuns!(VbLevel.Info).vbImplw;
+/// Ditto
+alias infowf = vbFuns!(VbLevel.Info).vbImplwf;
+/// Ditto
+alias warningw = vbFuns!(VbLevel.Warn).vbImplw;
+/// Ditto
+alias warningwf = vbFuns!(VbLevel.Warn).vbImplwf;
+/// Ditto
+alias errorw = vbFuns!(VbLevel.None).vbImplw;
+/// Ditto
+alias errorwf = vbFuns!(VbLevel.None).vbImplwf;
+
+
+version(unittest)
+{
+    import std.conv : to;
+
+    /// Structured type for tests.
+    struct StrAndInt
+    {
+        string str;
+        int i;
+        string toString() const { return str ~ to!string(i); }
+    }
+}
+
+/// error unittest
+unittest
+{
+    import std.stdio : File;
+    import dutil : bkv, unused;
+    import fileutil : getText;
+    import osutil : removeIfExists;
+
+    auto stderr0 = bkv(stderr);
+    unused(stderr0);
+    stderr = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
+    scope(exit) removeIfExists(stderr.name);
+    File f = File(deleteme ~ ".file." ~ __FUNCTION__, "a+");
+    scope(exit) removeIfExists(f.name);
+
+    error!(WithPrefix.Yes)(f, "msg1.0, ", "msg2, ", 3);
+    assert(f.getText() == "Error: msg1.0, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error!(WithPrefix.No)(f, "msg1.1, ", "msg2, ", 3);
+    assert(f.getText() == "msg1.1, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error("msg1.2, ", "msg2, ", 3);
+    assert(stderr.getText() == "Error: msg1.2, msg2, 3",
+           "getText() == " ~ stderr.getText());
+
+    error!(WithPrefix.Yes)("msg1.3, ", "msg2, ", 3);
+    assert(stderr.getText() == "Error: msg1.3, msg2, 3",
+           "getText() == " ~ stderr.getText());
+
+    error!(WithPrefix.Yes)("msg1.4, ", "msg2, ", 3);
+    assert(stderr.getText() == "Error: msg1.4, msg2, 3",
+           "getText() == " ~ stderr.getText());
+
+    error!(WithPrefix.Yes)(f, false, "msg1.5, ", "msg2, ", 3);
+    // previous message msg1.1 is expected.
+    assert(f.getText() == "msg1.1, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error!(WithPrefix.Yes)(f, true, "msg1.5, ", "msg2, ", 3);
+    // new message msg1.5 is expected.
+    assert(f.getText() == "Error: msg1.5, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error!(WithPrefix.No)(f, false, "msg1.6, ", "msg2, ", 3);
+    // previous message msg1.5 is expected.
+    assert(f.getText() == "Error: msg1.5, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error!(WithPrefix.No)(f, true, "msg1.6, ", "msg2, ", 3);
+    // new message msg1.6 is expected.
+    assert(f.getText() == "msg1.6, msg2, 3",
+           "getText() == " ~ f.getText());
+
+    error(false, "msg1.7, ", "msg2, ", 3);
+    // previous message msg1.4 is expected.
+    assert(stderr.getText() == "Error: msg1.4, msg2, 3",
+           "getText() == " ~ stderr.getText());
+
+    error(true, "msg1.7, ", "msg2, ", 3);
+    // new message msg1.7 is expected.
+    assert(stderr.getText() == "Error: msg1.7, msg2, 3",
+           "getText() == " ~ stderr.getText());
+}
+
+
+/// errorf unittest
+unittest
+{
+    import std.stdio : File;
+    import dutil : bkv, unused;
+    import fileutil : getText;
+    import osutil : removeIfExists;
+
+    auto stderr0 = bkv(stderr);
+    unused(stderr0);
+    stderr = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
+    scope(exit) removeIfExists(stderr.name);
+    File f = File(deleteme ~ ".file." ~ __FUNCTION__, "a+");
+    scope(exit) removeIfExists(f.name);
+
+    errorf!(WithPrefix.Yes)("%s, %s: %d", f, "msg1.0", "msg2", 3);
+    assert(f.getText() == "Error: msg1.0, msg2: 3",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.No)("%s; %s | %d", f, "msg1.1", "msg2", 3);
+    assert(f.getText() == "msg1.1; msg2 | 3",
+           "getText() == " ~ f.getText());
+
+    errorf("%s. %s -%d", f, "msg1.2", "msg2", 3);
+    assert(f.getText() == "Error: msg1.2. msg2 -3",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.Yes)("%s_%s+%d", f, "msg1.3", "msg2", 3);
+    assert(f.getText() == "Error: msg1.3_msg2+3",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.Yes)("%s * %s ^ %d", "msg1.4", "msg2", 3);
+    assert(stderr.getText() == "Error: msg1.4 * msg2 ^ 3",
+           "getText() == " ~ stderr.getText());
+
+    errorf!(WithPrefix.Yes)(false, "%s~%s..%d...", f, "msg1.5", "msg2", 3);
+    // previous message msg1.3 is expected.
+    assert(f.getText() == "Error: msg1.3_msg2+3",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.Yes)(true, "%s~%s..%d ...", f, "msg1.5", "msg2", 3);
+    // new message msg1.5 is expected.
+    assert(f.getText() == "Error: msg1.5~msg2..3 ...",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.No)(false, "%s = %s + %d", f, "msg1.6", "msg2", 3);
+    // previous message msg1.5 is expected.
+    assert(f.getText() == "Error: msg1.5~msg2..3 ...",
+           "getText() == " ~ f.getText());
+
+    errorf!(WithPrefix.No)(true, "%s = %s + %d", f, "msg1.6", "msg2", 3);
+    // new message msg1.6 is expected.
+    assert(f.getText() == "msg1.6 = msg2 + 3",
+           "getText() == " ~ f.getText());
+
+    errorf(false, "[%s] %s(%d)", "msg1.7", "msg2", 3);
+    // previous message msg1.4 is expected.
+    assert(stderr.getText() == "Error: msg1.4 * msg2 ^ 3",
+           "getText() == " ~ stderr.getText());
+
+    errorf(true, "[%s] %s(%d)", "msg1.7", "msg2", 3);
+    // new message msg1.7 is expected.
+    assert(stderr.getText() == "Error: [msg1.7] msg2(3)",
+           "getText() == " ~ stderr.getText());
+}
+
+
+/// errorw unittest
+unittest
+{
+    import std.stdio : File;
+    import fileutil : getText;
+    import osutil : removeIfExists;
+
+    File f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
+    scope(exit)
+        removeIfExists(f.name);
+    auto w = f.lockingTextWriter();
+
+    errorw!(typeof(w), WithPrefix.Yes)(w, "one arg");
+    assert(f.getText() == "Error: one arg", "getText() == " ~ f.getText());
+
+    errorw!(typeof(w), WithPrefix.Yes)(w,
+                                       "two args(1), ",
+                                       2);
+    assert(f.getText() == "Error: two args(1), 2",
+           "getText() == " ~ f.getText());
+
+    errorw!(typeof(w), WithPrefix.Yes)(w, 3, " args(2) |", 3);
+    assert(f.getText() == "Error: 3 args(2) |3",
+           "getText() == " ~ f.getText());
+
+    errorw!(typeof(w), WithPrefix.Yes)(w, "Four args(1);", 2, "; 3, ",
+                                       StrAndInt("Four=", 4));
+    assert(f.getText() == "Error: Four args(1);2; 3, Four=4",
+           "getText() == " ~ f.getText());
+
+    errorw(w, false, "condition: ", 3, " args.");
+    // Note: previous message Four args(1) expected.
+    assert(f.getText() == "Error: Four args(1);2; 3, Four=4",
+           "getText() == " ~ f.getText());
+
+    errorw(w, true, "condition: ", 3, " args.");
+    // Note: new message 3 args expected.
+    assert(f.getText() == "Error: condition: 3 args.",
+           "getText() == " ~ f.getText());
+
+    errorw!(typeof(w), WithPrefix.No)
+           (w, false, "condition: Four args(", 2, "); ", 3,
+            StrAndInt(", Four=", 4));
+    // Note: previous message 3 args expected.
+    assert(f.getText() == "Error: condition: 3 args.",
+           "getText() == " ~ f.getText());
+
+    errorw!(typeof(w), WithPrefix.No)
+           (w, true, "condition: Four args(", 2, "); ", 3,
+            StrAndInt(", Four=", 4));
+    // Note: new message Four args expected.
+    assert(f.getText() == "condition: Four args(2); 3, Four=4",
+           "getText() == " ~ f.getText());
+}
+
+
+/// errorwf unittest
+unittest
+{
+    import std.stdio : File;
+    import dutil : bkv, unused;
+    import fileutil : getText;
+    import osutil : removeIfExists;
+
+    auto f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
+    auto w = f.lockingTextWriter();
+
+    errorwf!(typeof(w), WithPrefix.Yes)("one(%d) arg", w, 1);
+    assert(f.getText() == "Error: one(1) arg", "getText() == " ~ f.getText());
+
+    errorwf!(typeof(w), WithPrefix.No)("A second (%dnd) arg", w, 2);
+    assert(f.getText() == "A second (2nd) arg", "getText() == " ~ f.getText());
+
+    errorwf("A third(%drd) arg", w, 3);
+    assert(f.getText() == "Error: A third(3rd) arg",
+           "getText() == " ~ f.getText());
+
+    errorwf!(typeof(w), WithPrefix.Yes)("(%dst) two args(%d)", w, 1, 2);
+    assert(f.getText() == "Error: (1st) two args(2)",
+           "getText() == " ~ f.getText());
+
+    errorwf!(typeof(w), WithPrefix.No)("(%dnd) two args(%d)", w, 2, 2);
+    assert(f.getText() == "(2nd) two args(2)",
+           "getText() == " ~ f.getText());
+
+    errorwf("(%drd) two args(%d)", w, 3, 2);
+    assert(f.getText() == "Error: (3rd) two args(2)",
+           "getText() == " ~ f.getText());
+
+    errorwf(false, "condition %d args(%d) => %d", w, 3, 2, 3);
+    // Note: previous message 3rd two args expected.
+    assert(f.getText() == "Error: (3rd) two args(2)",
+           "getText() == " ~ f.getText());
+
+    errorwf(true, "condition %d args(%d) => %d", w, 3, 2, 3);
+    // Note: new message 3 args expected.
+    assert(f.getText() == "Error: condition 3 args(2) => 3",
+           "getText() == " ~ f.getText());
+
+    errorwf(false, "condition %s args(%d);%d; %s, %s", w,
+            "Four", 2, "3", StrAndInt("Four=", 4));
+    // Note: previous message 3 args expected.
+    assert(f.getText() == "Error: condition 3 args(2) => 3",
+           "getText() == " ~ f.getText());
+
+    errorwf!(typeof(w), WithPrefix.No)
+            (true, "condition Four args(%d);%d; %s, %s", w,
+             1, 2, "3", StrAndInt("Four=", 4));
+    // Note: new message Four args expected.
+    assert(f.getText() == "condition Four args(1);2; 3, Four=4",
+           "getText() == " ~ f.getText());
+}
 
