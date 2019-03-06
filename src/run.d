@@ -61,7 +61,8 @@ void run_parsed(void function(string[]) main, string[] args)
 
         try
         {
-            main(args);
+            // Remove program path.
+            main(args[1..$]);
         }
         catch(Exception ex)
         {
