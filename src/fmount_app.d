@@ -22,6 +22,7 @@ import std.stdio;
 import argsutil;
 import mnt.mount : fmount;
 import run : run_parsed;
+import ui : error;
 
 /**
  * The `fmount` program entry point.
@@ -65,7 +66,7 @@ void main(string[] args)
     }
     catch(GetOptException goe)
     {
-        writeln(goe.msg);
+        error(goe.msg);
     }
 }
 

@@ -21,9 +21,9 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module mnt.umount;
 
-import std.stdio : writeln;
+import ui : info_;
 
 void fumount(string[] args) {
-    writeln("running fumount");
+    info_("running fumount");
 }
 

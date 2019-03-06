@@ -25,7 +25,7 @@ import std.file : dirEntries, exists, FileException, isDir, mkdir, readText,
 import std.path : dirName, isAbsolute;
 import std.process : ProcessException;
 import std.regex : matchFirst, regex;
-import std.stdio : writeln;
+import std.stdio : stderr;
 import std.string : format;
 import std.traits : isSomeString;
 
@@ -35,6 +35,7 @@ import constvals : how_to_run_as_root;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
 import dutil : printThChain;
 import osutil : assertDirExists, jn;
+import ui : dbug, error, errorf, info_, trace, tracef, warning, WithPrefix;
 
 
 // TODO use args.get_conf_dir(verbose, test), create a config file .fmountrc,
@@ -95,16 +96,14 @@ if (isSomeString!S)
 
     if ( !exists(path) )
     {
-        if (verbose >= VbLevel.More)
-            writeln("Creating directory ", path);
+        trace("Creating directory ", path);
         if (!fake)
             mkdir(path);
 
         auto autocreated_file = jn(path, CreatedBy.Fmount);
-        if (verbose >= VbLevel.Dbug)
-            writeln("Creating file ", autocreated_file);
+        dbug("Creating file ", autocreated_file);
         if (!fake)
-            write(autocreated_file, "");
+            autocreated_file.write("");
     }
     else if ( !isDir(path) )
     {
@@ -145,8 +144,7 @@ if (isSomeString!S)
             autocreated = true;
             auto autocreated_file = jn(path, entries[0]);
 
-            if (verbose >= VbLevel.Dbug)
-                writeln("Removing ", autocreated_file);
+            dbug("Removing ", autocreated_file);
             if (!fake)
             {
                 try
@@ -163,8 +161,7 @@ if (isSomeString!S)
 
     if (autocreated)
     {
-        if (verbose >= VbLevel.More)
-            writeln("Removing directory ", path);
+        trace("Removing directory ", path);
         if (!fake)
             rmdir(path);
     }
@@ -277,6 +274,7 @@ void check_user(S)(S device, S prog)
 if (isSomeString!S)
 {
     import core.sys.posix.unistd : geteuid;
+    import std.process : environment;
 
     import osutil : getRealUserAndGroup;
 
@@ -287,6 +285,14 @@ if (isSomeString!S)
 
     if (euid == 0)
     {
+        string sudoCmd = environment.get("SUDO_COMMAND");
+        string superCmd = environment.get("SUPERCMD");
+
+        if (sudoCmd)
+            tracef("Running sudo command '%s'.", sudoCmd);
+        else if (superCmd)
+            tracef("Running super command '%s'.", superCmd);
+
         bool removable = is_removable(device);
         bool usb = is_usb(device);
 
@@ -307,7 +313,7 @@ if (isSomeString!S)
                         r_or_u ~= " ";
                     r_or_u ~= "removable";
                 }
-                writeln(format(op_permitted, r_or_u, device, real_user));
+                tracef(op_permitted, r_or_u, device, real_user);
             }
 
             return;
@@ -319,16 +325,15 @@ if (isSomeString!S)
 
             // if the user is really root, only warn about fixed device;
             // otherwise the action is forbidden.
-            if (verbose >= VbLevel.Warn)
-                writeln("The device ", device, " is not removable.");
+            warning("The device ", device, " is not removable.");
             if (real_user == "root:root")
                 return;
         }
     }
     else
     {
-        writeln(format!"%s cannot be run as '%s'."(prog, real_user));
-        writeln(how_to_run_as_root);
+        errorf("%s cannot be run as '%s'.", prog, real_user);
+        error!(WithPrefix.No)(how_to_run_as_root);
     }
 
     throw ProcessException.newFromErrno(EPERM);

@@ -22,8 +22,6 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module mnt.mount;
 
 import std.array : join;
-import std.stdio : writeln;
-import std.string : format;
 import std.traits : hasMember;
 
 import appconfig;
@@ -36,7 +34,7 @@ import luks : luksOpen, luksClose;
 import mnt.common : check_user, ensure_mntdir_exists, find_mountpoint,
                     get_expected_mountpoint, remove_automatically_created_dir;
 import osutil : get_exec_path, runCommand;
-import ui : read_password, show_warnings;
+import ui : dbugf, info_, infof, read_password, show_warnings;
 
 
 /**
@@ -53,17 +51,15 @@ void fmount(string[] args) {
     else
         mountpoint = "";
 
-    if (verbose >= VbLevel.Dbug)
-    {
-        immutable string fmt = q"TXT
-fmount(device_path=%s,
-       mountpoint=%s);
-TXT";
-        writeln(format!fmt(device_path, mountpoint));
-    }
+    enum fmountArgsFmt = `
+  fmount(device_path=%s,
+         mountpoint=%s);
+    `;
+
+    dbugf(fmountArgsFmt, device_path, mountpoint);
 
     if (args.length > 1)
-        mountpoint = args[1];
+        mountpoint = args[2];
     else
     {
         // TODO retrieve from disk label
@@ -78,16 +74,12 @@ TXT";
 
     if (current_mountpoint !is null && current_mountpoint.length > 0)
     {
-        if (verbose >= VbLevel.Info)
-        {
-            immutable fmt = "Note : %s is already mounted at %s .";
-            writeln(format!fmt(descr, current_mountpoint));
-        }
+        enum AlreadyMountedFmt = "Note : %s is already mounted at %s .";
+        infof(AlreadyMountedFmt, descr, current_mountpoint);
         return;
     }
 
-    if (verbose >= VbLevel.Info)
-        writeln("Mounting ", descr);
+    info_("Mounting ", descr);
 
     if (mountpoint is null || mountpoint.length == 0)
         mountpoint = dev_display(device_path);
