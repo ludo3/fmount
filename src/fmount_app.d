@@ -58,10 +58,13 @@ void main(string[] args)
                                    parsed_args.options);
         }
         else {
+            string progName = args[0];
+            args = args[1..$];
+
             if (args.length < 1 || args.length > 2)
                 throw ArgumentException.badNb(1, 2, args.length);
 
-            run_parsed(&fmount, args);
+            run_parsed(&fmount, progName, args);
         }
     }
     catch(GetOptException goe)

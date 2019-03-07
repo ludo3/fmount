@@ -23,7 +23,7 @@ module mnt.umount;
 
 import ui : info_;
 
-void fumount(string[] args) {
+void fumount(string prog, string[] args) {
     info_("running fumount");
 }
 

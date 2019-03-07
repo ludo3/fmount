@@ -52,7 +52,8 @@ void main(string[] args)
                                 parsed_args.options);
         }
         else {
-            run_parsed(&fumount, args);
+            string progName = args[0];
+            run_parsed(&fumount, progName, args[1..$]);
         }
     }
     catch(GetOptException goe)

@@ -42,13 +42,14 @@ import ui : dbugf, info_, infof, read_password, show_warnings;
  * Params:
  *     args = The positional arguments.
  */
-void fmount(string[] args) {
+void fmount(string prog, string[] args) {
     immutable string device_path = dev_path(args[0]);
     string mountpoint;
 
     if (args.length > 1)
         mountpoint = args[1];
     else
+        // TODO retrieve from disk label
         mountpoint = "";
 
     enum fmountArgsFmt = `
@@ -58,14 +59,8 @@ void fmount(string[] args) {
 
     dbugf(fmountArgsFmt, device_path, mountpoint);
 
-    if (args.length > 1)
-        mountpoint = args[2];
-    else
-    {
-        // TODO retrieve from disk label
-    }
-
     check_user(device_path, "fmount");
+    dbugf("%s successful", "check_user");
 
     immutable mount_prog = get_exec_path("mount", exec_dirs);
 

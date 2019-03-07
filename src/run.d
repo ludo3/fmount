@@ -50,9 +50,11 @@ alias main_fun = void delegate(string[]);
  *
  * Params:
  *     main    = The entry point to be run.
+ *     prog    = The program path.
  *     args    = The program arguments.
  */
-void run_parsed(void function(string[]) main, string[] args)
+void run_parsed(void function(string, string[]) main,
+                string prog, string[] args)
 {
         check_exec_dirs();
 
@@ -61,8 +63,7 @@ void run_parsed(void function(string[]) main, string[] args)
 
         try
         {
-            // Remove program path.
-            main(args[1..$]);
+            main(prog, args);
         }
         catch(Exception ex)
         {
