@@ -30,9 +30,9 @@ import std.string : endsWith, format, indexOf, join, toLower;
 import std.traits : isSomeString;
 import std.typecons : tuple;
 
-import argsutil : verbose;
 import constvals : DevDir, DevMapperDir, VbLevel;
 import osutil : get_exec_path, jn, readIntFile, runCommand;
+import ui: dbug, dbugf;
 
 alias bn = baseName;
 alias dn = dirName;
@@ -121,10 +121,10 @@ if (isSomeString!S)
 
 /** All reached phisical disk directories. */
 private immutable auto ALL_DISK_DIRS = [
-    text(DevDir.Root),
-    text(DevDir.Uuid),
-    text(DevDir.Label),
-    text(DevDir.PartUuid),
+    DevDir.Root.dup,
+    DevDir.Uuid.dup,
+    DevDir.Label.dup,
+    DevDir.PartUuid.dup,
 ];
 
 
@@ -179,10 +179,12 @@ if (isSomeString!S)
     if (isSymlink(dev))
         return bn(dev);
 
+    dbugf("dev_display(%s) : call dev_label", dev);
     S label = dev_label(dev);
     if (label)
         return label;
 
+    dbugf("dev_display(%s) : call dev_name", dev);
     return dev_name(dev);
 }
 
@@ -201,11 +203,10 @@ if (isSomeString!S)
 
     if (exists(link_dir))
     {
-        foreach (S link_name; dirEntries(link_dir, SpanMode.shallow))
+        foreach (S link; dirEntries(link_dir, SpanMode.shallow))
         {
-            S link = jn(link_dir, link_name);
             if (name == bn(readLink(link)))
-                return link_name;
+                return bn(link);
         }
     }
 
@@ -276,7 +277,7 @@ if (isSomeString!S)
 S _get_blkid_attr(S)(S dev, S attr)
 if (isSomeString!S)
 {
-    S blkid_path = get_exec_path("blkid");
+    S blkid_path = get_exec_path("blkid", ["/usr/local/sbin", "/sbin"]);
     try
     {
         static immutable S fmt = "%s -s '%s' -o value '%s'";
@@ -286,8 +287,7 @@ if (isSomeString!S)
     }
     catch(Exception ex)
     {
-        if (verbose == VbLevel.Dbug)
-            writeln(ex.message);
+        dbug(ex.message);
         return "";
     }
 }
@@ -351,8 +351,8 @@ if (isSomeString!S)
         if (endsWith(d, dirSeparator))
             d = d[0..$-1];
 
-        auto files = map!(e => jn(d, e))(dirEntries(d, SpanMode.shallow));
-        auto lnks = filter!(f => isSymlink(f)
+        auto files = dirEntries(d, SpanMode.shallow);
+        auto lnks = filter!(f => isSymlink(to!string(f))
             && path == absolutePath(jn(d, readLink(f))))(files);
         linksCat ~= lnks;
     }
@@ -456,10 +456,10 @@ if (isSomeString!S)
  *     dev = A path to a block device.
  *     ret = The result of the function.
  */
-private void _dbg_is_(S, R)(S is_xxx_name, S dev, R ret)
+private void _dbg_is_(S, R)(lazy S is_xxx_name, lazy S dev, R ret)
 if (isSomeString!S)
 {
-    writeln(format!"%s(%s)=%s"(is_xxx_name, dev_descr(dev), text(ret)));
+    dbugf("%s(%s)=%s", is_xxx_name, dev_descr(dev), text(ret));
 }
 
 
@@ -479,8 +479,7 @@ if (isSomeString!S)
         return false;
 
     immutable bool ret = dev_fs_usage(dev) == "crypto" && !is_dm(dev);
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_encrypted", dev, ret);
+    _dbg_is_("is_encrypted", dev, ret);
     return ret;
 }
 
@@ -495,8 +494,7 @@ bool is_usb(S)(S dev)
 if (isSomeString!S)
 {
     immutable bool ret = indexOf(toLower(dev_hardware_path(dev)), "usb") >= 0;
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_usb", dev, ret);
+    _dbg_is_("is_usb", dev, ret);
     return ret;
 }
 
@@ -513,15 +511,14 @@ if (isSomeString!S)
     immutable S part_name = dev_name(dev);
     immutable S sysroot = "/sys/block";
 
-    foreach (S sysentry; dirEntries(sysroot, SpanMode.shallow))
+    foreach (S sysdir; dirEntries(sysroot, SpanMode.shallow))
     {
-        auto sysdir = jn(sysroot, sysentry);
-        foreach (S entry; dirEntries(sysdir, SpanMode.shallow))
+        foreach (S part; dirEntries(sysdir, SpanMode.shallow))
         {
-            if (entry == part_name)
+            if (bn(part) == part_name)
             {
                 // /sys/block/sdb/sdb1 => sdb
-                return to!S(sysentry);
+                return to!S(bn(sysdir));
             }
         }
     }
@@ -540,14 +537,16 @@ bool is_removable(S)(S dev)
 if (isSomeString!S)
 {
     S hwname = dev_name(dev);
+    /+import ui:dbug;
+    dbug("is_partition(dev) is ", is_partition(dev));+/
+    // FIXME debug is_partition, then get_disk_name
     if (is_partition(dev))
         hwname = get_disk_name(dev);
     immutable S removable_path = format!"/sys/class/block/%s/removable"(hwname);
 
     immutable bool ret = readIntFile(removable_path) != 0;
 
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_removable", dev, ret);
+    _dbg_is_("is_removable", dev, ret);
 
     return ret;
 }
@@ -565,9 +564,9 @@ if (isSomeString!S)
     S syspart = format!"/sys/class/block/%s/partition"(dev_name(dev));
     immutable bool ret = exists(syspart);
 
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_partition", dev, ret);
+    _dbg_is_("is_partition", dev, ret);
 
+    import ui:dbug;dbug("is_partition: return ", ret);
     return ret;
 }
 
@@ -585,9 +584,8 @@ if (isSomeString!S)
 
     bool ret;
 
-    foreach (S e; dirEntries(DevMapperDir, SpanMode.shallow))
+    foreach (S lnk; dirEntries(DevMapperDir, SpanMode.shallow))
     {
-        S lnk = jn(DevMapperDir, e);
         if (isSymlink(lnk))
         {
             if (bn(readLink(lnk)) == name)
@@ -598,8 +596,7 @@ if (isSomeString!S)
         }
     }
 
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_dm", dev, ret);
+    _dbg_is_("is_dm", dev, ret);
 
     return ret;
 }
@@ -617,8 +614,7 @@ if (isSomeString!S)
     immutable S usage = dev_fs_usage(dev);
     immutable bool ret = indexOf(["filesystem", "crypto"], usage) >= 0;
 
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_fs", dev, ret);
+    _dbg_is_("is_fs", dev, ret);
 
     return ret;
 }
@@ -645,8 +641,7 @@ if (isSomeString!S)
         ret = readText(devtype_path) == "8:0";
     }
 
-    if (verbose >= VbLevel.Dbug)
-        _dbg_is_("is_disk", dev, ret);
+    _dbg_is_("is_disk", dev, ret);
 
     return ret;
 }
@@ -730,12 +725,12 @@ if (isSomeString!S)
     if (is_encrypted(disk))
     {
         immutable S dm_name = get_dm_name(disk);
-        foreach(S entry; dirEntries(DevMapperDir, SpanMode.shallow))
+        foreach(S dm; dirEntries(DevMapperDir, SpanMode.shallow))
         {
-            if (entry == dm_name)
+            if (bn(dm) == dm_name)
             {
                 encrypted_disk = disk;
-                disk = jn(DevMapperDir, dm_name);
+                disk = dm;
                 break;
             }
         }
