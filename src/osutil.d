@@ -25,13 +25,14 @@ import std.process : environment, execute, executeShell, ProcessException,
                      thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
 import std.regex : Regex, regex, split;
-import std.stdio : File, writeln;
-import std.string : format, indexOf, join, split, tr;
+import std.stdio : File, stderr, writeln;
+import std.string : format, indexOf, join, split, strip, tr;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
 
 import argsutil;
 import constvals : ModePrivateRWX, VbLevel;
+import ui : trace, tracef;
 
 
 /**
@@ -59,6 +60,7 @@ string get_exec_path(string name, string[] exec_dirs=[],
             return exec_path;
     }
 
+    tracef("No '%s' in PATH=%s", name, environment.get(env_var, ""));
     throw new FileException(name, ENOENT);
 }
 
@@ -284,10 +286,7 @@ void chown(string user, string path)
  */
 string runCommand(string command)
 {
-    if (verbose >= VbLevel.Info)
-    {
-        writeln(command);
-    }
+    trace(command);
     if (!fake)
     {
         try
@@ -497,7 +496,7 @@ if (isSomeString!S)
 int readIntFile(S)(S path)
 if (isSomeString!S)
 {
-    return to!int(readText(path));
+    return to!int(readText(path).strip);
 }
 
 
