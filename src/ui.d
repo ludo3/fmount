@@ -70,7 +70,7 @@ string getpass(string reason, bool confirm = false)
         throw new PasswordException("Password confirmation mismatch");
     }
 
-    if (pwd !is null || pwd.length == 0)
+    if (pwd is null || pwd.length == 0)
         throw new PasswordException("Empty password");
 
     return pwd;
@@ -278,7 +278,7 @@ template vbFuns(VbLevel vl)
        warn(486, "is an integer number");
        info(486, "is an integer number");
        trace(486, "is an integer number");
-       debug(486, "is an integer number");
+       dbug(486, "is an integer number");
        --------------------
     */
     void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
@@ -323,7 +323,7 @@ template vbFuns(VbLevel vl)
        warn(486, "is an integer number");
        info(486, "is an integer number");
        trace(486, "is an integer number");
-       debug(486, "is an integer number");
+       dbug(486, "is an integer number");
        --------------------
     */
     void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
@@ -368,7 +368,7 @@ template vbFuns(VbLevel vl)
        warn(true, 789, "is an integer number");
        info(false, 123, "is an integer number");
        trace(false, 543, "is an integer number");
-       debug(false, 876, "is an integer number");
+       dbug(false, 876, "is an integer number");
        --------------------
     */
     void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
@@ -412,7 +412,7 @@ template vbFuns(VbLevel vl)
        warn(486, "is an integer number");
        info(486, "is an integer number");
        trace(486, "is an integer number");
-       debug(486, "is an integer number");
+       dbug(486, "is an integer number");
        --------------------
     */
     void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
@@ -422,6 +422,75 @@ template vbFuns(VbLevel vl)
     {
         if (verbose >= vl && condition)
             doVbImplw!(W, prefix, A)(writer, args);
+    }
+
+    /**
+       This function dumps the stack trace of a caught throwable object to the
+       standard error, or to the standard output for the `info` level, if the
+       `verbose` program argument is at least `vl`.
+
+       Params:
+         prefix    = `WithPrefix.No` if the `vl` prefix must be disabled.
+         A         = The argument types.
+         output    = The file to which the data are written.
+         throwable = The caught throwable to be dumped.
+
+       Example:
+       --------------------
+       errorStack(theException);
+       warnStack(theException);
+       infoStack(theException);
+       traceStack(theException);
+       dbugStack(theException);
+       --------------------
+    */
+    void vbStack(WithPrefix prefix=WithPrefix.Yes)
+                (File output, Throwable throwable)
+    {
+        if (verbose >= vl)
+        {
+            auto writer = output.lockingTextWriter();
+            vbStackw!(typeof(writer), prefix)(writer, throwable);
+        }
+    }
+
+    /// Ditto
+    void vbStack(WithPrefix prefix=WithPrefix.Yes)(Throwable throwable)
+    {
+        if (verbose >= vl)
+        {
+            auto writer = dfltOut.lockingTextWriter();
+            vbStackw!(typeof(writer), prefix)(writer, throwable);
+        }
+    }
+
+    /**
+       This function dumps the stack trace of a caught throwable object to an
+       output range, if the `verbose` program argument is at least `vl`.
+
+       Params:
+         prefix    = `WithPrefix.No` if the `vl` prefix must be disabled.
+         writer    = The output range receiving the data.
+         throwable = The caught throwable to be dumped.
+
+       Example:
+       --------------------
+       errorStackw(myFile.lockingTextWriter(), theException);
+       warnStackw(myFile.lockingTextWriter(), theException);
+       infoStackw(myFile.lockingTextWriter(), theException);
+       traceStackw(myFile.lockingTextWriter(), theException);
+       dbugStackw(myFile.lockingTextWriter(), theException);
+       --------------------
+    */
+    void vbStackw(W, WithPrefix prefix=WithPrefix.Yes)
+                 (W writer, ref Throwable throwable)
+    {
+        if (verbose >= vl)
+        {
+            // Note https://tour.dlang.org/tour/en/gems/opdispatch-opapply
+            foreach(Throwable inChain; throwable)
+                doVbImplw!(typeof(writer), prefix, Throwable)(writer, inChain);
+        }
     }
 
     /**
@@ -444,7 +513,7 @@ template vbFuns(VbLevel vl)
        warnf("%d is an integer number", 789);
        infof("%d is an integer number", 123);
        tracef("%d is an integer number", 543);
-       debugf("%d is an integer number", 876);
+       dbugf("%d is an integer number", 876);
        --------------------
     */
     void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
@@ -488,7 +557,7 @@ template vbFuns(VbLevel vl)
        warn(486, "is an integer number");
        info(486, "is an integer number");
        trace(486, "is an integer number");
-       debug(486, "is an integer number");
+       dbug(486, "is an integer number");
        --------------------
     */
     void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
@@ -535,7 +604,7 @@ template vbFuns(VbLevel vl)
        warnf(true, "%d is an integer number", 789);
        infof(false, "%d is an integer number", 123);
        tracef(false, "%d is an integer number", 543);
-       debugf(false, "%d is an integer number", 876);
+       dbugf(false, "%d is an integer number", 876);
        --------------------
     */
     void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
@@ -580,7 +649,7 @@ template vbFuns(VbLevel vl)
        warn(486, "is an integer number");
        info(486, "is an integer number");
        trace(486, "is an integer number");
-       debug(486, "is an integer number");
+       dbug(486, "is an integer number");
        --------------------
     */
     void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
@@ -635,6 +704,29 @@ alias errorw = vbFuns!(VbLevel.None).vbImplw;
 /// Ditto
 alias errorwf = vbFuns!(VbLevel.None).vbImplwf;
 
+// Stack trace aliases
+/// Ditto
+alias dbugStack = vbFuns!(VbLevel.Dbug).vbStack;
+/// Ditto
+alias traceStack = vbFuns!(VbLevel.More).vbStack;
+/// Ditto
+alias infoStack = vbFuns!(VbLevel.Info).vbStack;
+/// Ditto
+alias warnStack = vbFuns!(VbLevel.Warn).vbStack;
+/// Ditto
+alias errorStack = vbFuns!(VbLevel.None).vbStack;
+/// Ditto
+alias dbugStackw = vbFuns!(VbLevel.Dbug).vbStackw;
+/// Ditto
+alias traceStackw = vbFuns!(VbLevel.More).vbStackw;
+/// Ditto
+alias infoStackw = vbFuns!(VbLevel.Info).vbStackw;
+/// Ditto
+alias warnStackw = vbFuns!(VbLevel.Warn).vbStackw;
+/// Ditto
+alias errorStackw = vbFuns!(VbLevel.None).vbStackw;
+
+// TODO unittest for vbStack and vbStackw aliases
 
 version(unittest)
 {

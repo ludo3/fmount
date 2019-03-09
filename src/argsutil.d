@@ -175,12 +175,13 @@ immutable static string fake_help = "Disable any modification command.";
 /**
  * Print the parsed options and arguments.
  * Params:
+ *     prog    = The program name.
  *     args    = The remaining positional arguments.
  */
-void print_args(string[] args)
+void print_args(string prog, string[] args)
 {
     import std.stdio : stderr;
-    output_args!(tracef, stderr)(args);
+    output_args!(tracef, stderr)(prog, args);
 }
 
 
@@ -266,14 +267,15 @@ void optionHandler(string program_option, string value)
  * Params:
  *     uifun  = One of the ui `infof`, `tracef`, ... functions.
  *     output = An output range used to write the options and arguments.
+ *     prog   = The program name.
  *     args   = The positional arguments.
  */
-void output_args(alias uifun, alias output)(string[] args)
+void output_args(alias uifun, alias output)(string prog, string[] args)
 if (is(typeof(output) == typeof(stderr)))
 {
     enum fmt = "%s is '%s'.\n";
 
-    uifun("%s Options:\n", output, args[0]);
+    uifun("%s Options:\n", output, prog);
     uifun(fmt, output, "passphrase", passphrase_file);
     uifun(fmt, output, "random_file", random_file);
     uifun(fmt, output, "exec_dirs", exec_dirs);

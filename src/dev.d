@@ -24,7 +24,8 @@ import std.algorithm.sorting : sort;
 import std.array : appender, array;
 import std.conv : text, to;
 import std.file : dirEntries, exists, isSymlink, readLink, readText, SpanMode;
-import std.path : absolutePath, baseName, dirName, dirSeparator, isAbsolute;
+import std.path : absolutePath, baseName, buildNormalizedPath, dirName,
+                  dirSeparator, isAbsolute;
 import std.stdio : writeln;
 import std.string : endsWith, format, indexOf, join, toLower;
 import std.traits : isSomeString;
@@ -120,7 +121,7 @@ if (isSomeString!S)
 
 
 /** All reached phisical disk directories. */
-private immutable auto ALL_DISK_DIRS = [
+private static immutable string[] ALL_DISK_DIRS = [
     DevDir.Root.dup,
     DevDir.Uuid.dup,
     DevDir.Label.dup,
@@ -154,7 +155,7 @@ if (isSomeString!S)
         }
     }
 
-    p = path;
+    p = absolutePath(path);
 
     if (isSymlink(p))
     {
@@ -163,7 +164,7 @@ if (isSomeString!S)
             p = jn(dn(path), p);
     }
 
-    return absolutePath(p);
+    return buildNormalizedPath(p);
 }
 
 
@@ -351,12 +352,16 @@ if (isSomeString!S)
         if (endsWith(d, dirSeparator))
             d = d[0..$-1];
 
-        auto files = dirEntries(d, SpanMode.shallow);
-        auto lnks = filter!(f => isSymlink(to!string(f))
-            && path == absolutePath(jn(d, readLink(f))))(files);
+        auto files = dirEntries(d, SpanMode.shallow).array;
+
+        auto lnks = files
+            .filter!(f => isSymlink(f.name)
+                          && path == absolutePath(buildNormalizedPath(jn(d, readLink(f.name)))))
+            .array;
         linksCat ~= lnks;
     }
 
+    dbugf("dev_link_paths : linksCat = %(%s, %)", linksCat.data);
     return linksCat.data;
 }
 
@@ -703,7 +708,7 @@ if (isSomeString!S)
     // Note: pmount uses '_dev_sdXN' as mapping label.
     // Example: DM_NAME='_dev_sdc1' for /dev/sdc1 encrypted partition.
     S prefix = "_dev_";
-    return prefix ~ dev_name(raw_device);
+    return prefix ~ dev_name(dev_path(raw_device));
 }
 
 

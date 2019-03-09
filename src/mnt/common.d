@@ -35,7 +35,8 @@ import constvals : how_to_run_as_root;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
 import dutil : printThChain;
 import osutil : assertDirExists, jn;
-import ui : dbug, error, errorf, info_, trace, tracef, warning, WithPrefix;
+import ui : dbug, dbugf, error, errorf, info_, trace, tracef, warning,
+            WithPrefix;
 
 
 // TODO use args.get_conf_dir(verbose, test), create a config file .fmountrc,

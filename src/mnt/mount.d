@@ -22,6 +22,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module mnt.mount;
 
 import std.array : join;
+import std.path : bn=baseName;
 import std.traits : hasMember;
 
 import appconfig;
@@ -34,33 +35,30 @@ import luks : luksOpen, luksClose;
 import mnt.common : check_user, ensure_mntdir_exists, find_mountpoint,
                     get_expected_mountpoint, remove_automatically_created_dir;
 import osutil : get_exec_path, runCommand;
-import ui : dbugf, info_, infof, read_password, show_warnings;
+import ui : dbugf, infof, read_password, show_warnings, traceStack;
 
 
 /**
  * Main fmount function.
  * Params:
+ *     prog = The fmount program path.
  *     args = The positional arguments.
  */
 void fmount(string prog, string[] args) {
-    immutable string device_path = dev_path(args[0]);
+    immutable string requested_device = args[0];
+    immutable string device_path = dev_path(requested_device);
     string mountpoint;
 
     if (args.length > 1)
         mountpoint = args[1];
-    else
-        // TODO retrieve from disk label
-        mountpoint = "";
 
     enum fmountArgsFmt = `
-  fmount(device_path=%s,
-         mountpoint=%s);
+  %s(device_path=%s, mountpoint=%s);
     `;
 
-    dbugf(fmountArgsFmt, device_path, mountpoint);
+    dbugf(fmountArgsFmt, prog, device_path, mountpoint);
 
     check_user(device_path, "fmount");
-    dbugf("%s successful", "check_user");
 
     immutable mount_prog = get_exec_path("mount", exec_dirs);
 
@@ -74,10 +72,10 @@ void fmount(string prog, string[] args) {
         return;
     }
 
-    info_("Mounting ", descr);
-
     if (mountpoint is null || mountpoint.length == 0)
-        mountpoint = dev_display(device_path);
+        mountpoint = bn(requested_device);
+
+    infof("Mounting %s to %s", descr, mountpoint);
 
     // request a password if needed,
     // put it password into a temporary file,
@@ -123,10 +121,9 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
     }
     catch(Exception ex)
     {
-        if (verbose >= VbLevel.More)
-            printThChain(ex);
+        traceStack(ex);
         string descr = dev_descr(disk, dev_display(disk));
-        show_warnings!(VbLevel.None)(descr ~ ": " ~ ex.toString());
+        show_warnings!(VbLevel.None)(descr ~ ": " ~ ex.message);
     }
 }
 

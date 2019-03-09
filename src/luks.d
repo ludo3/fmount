@@ -28,7 +28,7 @@ import argsutil : check_exec_dirs, luks_keyfile_args, fake, passphrase_file,
                   VbLevel, verbose;
 import constvals : DevMapperDir;
 import dev : dev_path;
-import osutil : jn, runCommand;
+import osutil : CommandFailedException, jn, runCommand;
 
 
 /**
@@ -45,7 +45,14 @@ if (isSomeString!S)
                           ~ ["luksFormat", dev_path(device)];
     immutable S cmd = join(cmdArr, " ");
 
-    runCommand(cmd);
+    try
+    {
+        runCommand(cmd);
+    }
+    catch(CommandFailedException ex)
+    {
+        throw LuksException.luksError(ex);
+    }
 }
 
 
@@ -75,12 +82,20 @@ if (isSomeString!S &&
            ~ ["luksOpen", dev_path(device), mapping_name]);
     immutable string openCmd = join(openCmdArr, " ");
 
-    runCommand(openCmd);
+    try
+    {
+        import ui: dbug; dbug("run command ", openCmd);
+        runCommand(openCmd);
+    }
+    catch(CommandFailedException ex)
+    {
+        throw LuksException.mappingFailed(mapping_name, ex);
+    }
 
     S dmdev = jn(DevMapperDir, mapping_name);
 
     if (!exists(dmdev) && !fake)
-        throw new LuksException(format!"LUKS mapping %s failed."(mapping_name));
+        throw LuksException.mappingFailed(mapping_name);
 
     return dmdev;
 }
@@ -101,7 +116,14 @@ if (isSomeString!S)
     // luksClose fails if it is run immediately after a formatting...
     Thread.sleep( msecs( 500 ) );
 
-    runCommand(closeCmd);
+    try
+    {
+        runCommand(closeCmd);
+    }
+    catch(CommandFailedException ex)
+    {
+        throw LuksException.luksError(mapping_name, ex);
+    }
 }
 
 
@@ -114,24 +136,47 @@ class LuksException : Exception
      * internal error, ...) .
      * Params:
      *     mapping_name = The name for the decrypted device.
+     *     cause        = The exception raising a `LuksException`.
      */
-    static LuksException mappingFailed(string mapping_name)
+    static LuksException mappingFailed(string mapping_name,
+                                       Exception cause=null)
     {
         string msg = format!"LUKS mapping %s failed."(mapping_name);
-        return new LuksException(msg);
+
+        if (cause is null)
+            return new LuksException(msg);
+
+        return new LuksException(msg, cause);
     }
 
     /// Create a LuksException related to a LUKS error.
-    static LuksException luksError(string mapping_name)
+    static LuksException luksError(string mapping_name, Exception cause=null)
     {
         string msg = format!"LUKS error for mapping %s."(mapping_name);
-        return new LuksException(msg);
+
+        if (cause is null)
+            return new LuksException(msg);
+
+        return new LuksException(msg, cause);
+    }
+
+    /// Create a LuksException related to a LUKS error.
+    static LuksException luksError(Exception cause)
+    {
+        string msg = format!"LUKS error: %s"(cause.message);
+        return new LuksException(msg, cause);
     }
 
     /// Constructor with the error message.
     private this(string message)
     {
         super(message);
+    }
+
+    /// Constructor with a causing exception.
+    private this(string message, Exception cause)
+    {
+        super(message, cause);
     }
 }
 

@@ -23,6 +23,7 @@ import std.stdio : writeln;
 
 import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
 import dutil : printThChain;
+import ui : info_;
 
 //TODO replace std.getopt with argsd library
 /**
@@ -59,7 +60,7 @@ void run_parsed(void function(string, string[]) main,
         check_exec_dirs();
 
         if (verbose >= VbLevel.More)
-            print_args(args);
+            print_args(prog, args);
 
         try
         {
@@ -69,8 +70,7 @@ void run_parsed(void function(string, string[]) main,
         {
             if (verbose >= VbLevel.Dbug)
                 printThChain(ex);
-            if (verbose >= VbLevel.More)
-                writeln(ex.msg);
+            info_(ex.msg);
         }
 }
 
