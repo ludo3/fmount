@@ -57,7 +57,7 @@ private string _getpass(const string prompt)
 string getpass(string reason, bool confirm = false)
 {
     immutable prompt1 = "Please enter password for %s: ";
-    string pwd = text(_getpass(format!prompt1(reason)));
+    string pwd = _getpass(format!prompt1(reason));
 
     if (confirm)
     {

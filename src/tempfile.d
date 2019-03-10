@@ -16,10 +16,12 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module tempfile;
 
-import std.array : join;
+import std.array : array, join;
 import std.conv : to;
 import std.file : tempDir;
+import std.path : buildNormalizedPath;
 import std.random : choice, Random, rndGen, uniform;
+import std.range: generate, take;
 import std.string : format;
 import std.traits;
 
@@ -28,9 +30,18 @@ import file : File;
 /// Note: same default prefix as in Python implementation.
 private enum DefaultPrefix = "tmp";
 
-private immutable string _characters =
-    ("abcdefghijklmnopqrstuvwxyz0123456789_"
-   ~ "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
+private enum string _characters =
+    "abcdefghijklmnopqrstuvwxyz0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+private char genOneChar()
+{
+    enum min = size_t(0);
+    enum max = _characters.length;
+    return _characters[uniform(min, max, rndGen)];
+}
+
+// FIXME replace File and NamedTemporaryFile with a struct containing a File
+// and a isTemporary property, removing file when reference count becomes zero.
 
 /**
  * A named file which is deleted as soon as it is closed.
@@ -98,9 +109,9 @@ class NamedTemporaryFile : File
 
             // FIXME this does not compile on 2018/08/08.
             //auto base = choice(_characters[0..$], rndGen);
-            auto base = _characters[uniform(size_t(0), $, rndGen)];
+            auto base = generate!(() => genOneChar)().take(12).array;
 
-            return dir ~ prefix ~ base ~ suffix;
+            return buildNormalizedPath(dir, prefix ~ base ~ suffix);
         }
 
 }

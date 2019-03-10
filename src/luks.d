@@ -84,7 +84,6 @@ if (isSomeString!S &&
 
     try
     {
-        import ui: dbug; dbug("run command ", openCmd);
         runCommand(openCmd);
     }
     catch(CommandFailedException ex)
