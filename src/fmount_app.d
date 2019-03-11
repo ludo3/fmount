@@ -19,10 +19,21 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import argsutil;
+import argsutil :
+    ArgumentException,
+    exec_dir_help, exec_dirs,
+    execDirHandler,
+    fake, fake_help,
+    option_help, options, optionHandler,
+    quiet_help,
+    verbose, verbose_help, verboseHandler;
+import dutil : named;
 import mnt.mount : fmount;
+import mountargs :
+    passphrase_file, passphrase_help,
+    norandom_help, randfileHandler, random_file, random_help, urandom_help;
 import run : run_parsed;
-import ui : error;
+import ui : error, traceStack;
 
 /**
  * The `fmount` program entry point.
@@ -64,11 +75,21 @@ void main(string[] args)
             if (args.length < 1 || args.length > 2)
                 throw ArgumentException.badNb(1, 2, args.length);
 
-            run_parsed(&fmount, progName, args);
+            run_parsed(&fmount, progName, args,
+                       named("passphrase", passphrase_file),
+                       named("random_file", random_file),
+                       named("exec_dirs", exec_dirs),
+                       named("options", options));
         }
+    }
+    catch(ArgumentException ae)
+    {
+        traceStack(ae);
+        error(ae.msg);
     }
     catch(GetOptException goe)
     {
+        traceStack(goe);
         error(goe.msg);
     }
 }

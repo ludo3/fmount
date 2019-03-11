@@ -50,17 +50,20 @@ alias main_fun = void delegate(string[]);
  * exceptions.
  *
  * Params:
+ *     Opts    = The types of the program-specific options.
  *     main    = The entry point to be run.
  *     prog    = The program path.
  *     args    = The program arguments.
+ *     customOptions = The program-specific options.
  */
-void run_parsed(void function(string, string[]) main,
-                string prog, string[] args)
+void run_parsed(Opts...)(void function(string, string[]) main,
+                         string prog, string[] args,
+                         Opts customOptions)
 {
         check_exec_dirs();
 
         if (verbose >= VbLevel.More)
-            print_args(prog, args);
+            print_args(prog, args, customOptions);
 
         try
         {

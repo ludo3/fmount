@@ -23,6 +23,7 @@ import std.range.primitives : ElementType, hasLength, isInputRange;
 import std.stdio : writeln;
 import std.traits: isArray, isAssignable, isIntegral, isScalarType,
                    isSomeString, Unqual;
+import std.typecons: tuple;
 
 
 /// Used to describe read-only, write-only and read-write properties.
@@ -1295,7 +1296,12 @@ if (!is(R : StrEquality!S) &&
 }
 
 
-/// Create a named value, i.e. a named tuple with one named element.
+/**
+   Create a specified value, i.e. a structure with a string `spec` with one
+   typed `value`.
+
+   Note: the `spec` does not need to be a valid dlang identifier.
+*/
 template from(alias fmt)
 if (isSomeString!(typeof(fmt)))
 {
@@ -1358,6 +1364,8 @@ if (isSomeString!(typeof(fmt)) && isSomeString!(typeof(s)))
     }
 }
 
+/// A named tuple with one element.
+alias named = tuple!("name", "value");
 
 /// Translate a string into a tuple of string and other data types.
 auto strToTuple(alias data, Args...)(auto ref Args replacements)

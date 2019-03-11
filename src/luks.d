@@ -24,10 +24,11 @@ import std.stdio : writeln;
 import std.string : format;
 import std.traits : hasMember, isSomeString;
 
-import argsutil : check_exec_dirs, luks_keyfile_args, fake, passphrase_file,
+import argsutil : check_exec_dirs, luks_keyfile_args, fake,
                   VbLevel, verbose;
 import constvals : DevMapperDir;
 import dev : dev_path;
+import mountargs : passphrase_file;
 import osutil : CommandFailedException, jn, runCommand;
 
 

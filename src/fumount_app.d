@@ -19,10 +19,17 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import argsutil;
+import argsutil :
+    ArgumentException,
+    exec_dir_help, exec_dirs,
+    execDirHandler,
+    fake, fake_help,
+    quiet_help,
+    verbose, verbose_help, verboseHandler;
+import dutil : named;
 import mnt.umount : fumount;
 import run;
-import ui : error;
+import ui : error, traceStack;
 
 /**
  * The `fmount` program entry point.
@@ -53,11 +60,23 @@ void main(string[] args)
         }
         else {
             string progName = args[0];
-            run_parsed(&fumount, progName, args[1..$]);
+            args = args[1..$];
+
+            if (args.length != 1)
+                throw ArgumentException.badNb(1, 1, args.length);
+
+            run_parsed(&fumount, progName, args,
+                       named("exec_dirs", exec_dirs));
         }
+    }
+    catch(ArgumentException ae)
+    {
+        traceStack(ae);
+        error(ae.msg);
     }
     catch(GetOptException goe)
     {
+        traceStack(goe);
         error(goe.msg);
     }
 }

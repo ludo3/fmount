@@ -28,10 +28,11 @@ import std.string : fromStringz, toStringz;
 import std.traits : isSomeChar, isSomeString;
 import unistd = core.sys.linux.unistd;
 
-import argsutil : passphrase_file, VbLevel, verbose;
+import argsutil : VbLevel, verbose;
 import constvals : With;
 import dev : dev_descr, dev_display, is_encrypted;
 import dutil : unused;
+import mountargs : passphrase_file;
 import tempfile : NamedTemporaryFile;
 
 version(unittest)

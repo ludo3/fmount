@@ -21,12 +21,15 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module mnt.mount;
 
-import std.array : join;
+import std.algorithm.iteration : filter;
+import std.algorithm.searching : canFind;
+import std.array : array, join;
+import std.functional : not;
 import std.path : bn=baseName;
 import std.traits : hasMember;
 
 import appconfig;
-import argsutil : exec_dirs, verbose;
+import argsutil : exec_dirs, options, verbose;
 import constvals : VbLevel;
 import dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
              is_encrypted;
@@ -128,6 +131,65 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
 }
 
 
+private immutable static string[][string] overriden_options;
+
+static this()
+{
+    immutable string[][string] opts = [
+        "async": ["sync"],
+        "atime": ["noatime", "diratime", "nodiratime",
+                  "norelatime", "relatime"],
+        "auto": ["noauto"],
+        "diratime": ["atime", "nodiratime", "norelatime", "relatime"],
+        "defaults":
+            ["rw", "suid",   "dev",   "exec",   "auto",   "nouser", "async",
+             "ro", "nosuid", "nodev", "noexec", "noauto", "user",   "sync"],
+        "dev": ["nodev"],
+        "exec": ["noexec"],
+        "iversion": ["noiversion"],
+        "lazytime": ["nolazytime"],
+        "loud": ["silent"],
+        "mand": ["nomand"],
+        "noauto": ["auto"],
+        "noatime": ["atime", "diratime", "nodiratime",
+                    "norelatime", "relatime"],
+        "nodev": ["dev"],
+        "nodiratime": ["diratime"],
+        "noexec": ["exec"],
+        "noiversion": ["iversion"],
+        "nolazytime": ["lazytime"],
+        "nomand":["mand"],
+        "norelatime": ["relatime"],
+        "nostrictatime": ["atime", "noatime", "nodiratime", "norelatime"],
+        "nosuid": ["suid"],
+        "nouser": ["user", "users"],
+        "owner": ["dev", "suid"], // owner implies nosuid and nodev
+        "relatime": ["norelatime"],
+        "ro": ["rw"],
+        "rw": ["ro"],
+        "silent": ["loud"],
+        "strictatime": ["noatime", "diratime", "nodiratime", "norelatime",
+                        "relatime"],
+        "suid": ["nosuid"],
+        "sync": ["async"],
+        "user": ["dev", "exec", "nouser", "suid"],
+        "users": ["dev", "exec", "nouser", "suid"]
+    ];
+
+    overriden_options = opts;
+}
+
+private string[] filteroutOverridenOpts(string newOption, string[] currOptions)
+{
+    immutable overrides = overriden_options.get(newOption, []);
+    bool isOverriden(string s) { return overrides.canFind(s); }
+
+    return currOptions
+        .filter!(a => not!isOverriden(a))()
+        .array;
+}
+
+
 /**
  * Parse the mount options and translate them for pmount or mount.
  */
@@ -173,10 +235,21 @@ private immutable(string[]) _get_mount_opts(string dev_file_system)
         for mnt_opt in mnt_options:
             comma_sep_opts.append(mnt_opt)
     +/
+    foreach(option; options)
+    {
+        comma_sep_opts = filteroutOverridenOpts(option, comma_sep_opts);
+    }
 
     if (comma_sep_opts.length)
         mount_opts ~= ["-o", comma_sep_opts.join(",")];
 
+    /+
+    import std.algorithm.iteration: map;
+    immutable(string)[] res;
+    foreach(s; comma_sep_opts)
+        res ~= s.idup;
+    +/
+    // = comma_sep_opts.map!(a => a.idup)().array;
     return mount_opts.idup;
 }
 

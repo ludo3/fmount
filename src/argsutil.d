@@ -21,14 +21,19 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module argsutil;
 
+import std.algorithm.iteration : filter;
+import std.array : array, join;
 import std.conv : text;
 import std.file : getSize;
+import std.format : format;
 import std.getopt : Option;
 import std.range.primitives : isOutputRange;
-import std.stdio;
-import std.string;
+import std.stdio : stderr;
+import std.traits : isInstanceOf;
+
 
 public import constvals : VbLevel;
+import dutil: named;
 import ui : tracef;
 
 
@@ -54,82 +59,6 @@ string[] luks_keyfile_args(const string password_file)
 
     return pass_args;
 }
-
-
-/// help for the passphrase option
-auto passphrase_help = outdent(join([
-    "If the device is encrypted (dm-crypt with LUKS metadata),",
-    " read the password from the 'passphrase' file instead of prompting",
-    " at the terminal.",
-    ], " "));
-
-// FIXME add a handler which checks existing readable file names.
-/// The full `passphrase_file` content is a password.
-string passphrase_file;
-
-
-private immutable static string dev = "/dev/";
-
-/// The known random source files.
-enum RandFile : string {
-    /// Disabled random source
-    None = "",
-
-    /// Synchronous random source
-    Random = dev ~ "random",
-
-    /// Asynchronous random source
-    Urandom = dev ~ "urandom"
-}
-
-/// The default random file is asynchronous : `RandFile.Urandom`.
-immutable static RandFile default_random_file = RandFile.Urandom;
-
-/**
- * Select the random source used to securize disk data.
- *
- * The possible random options are:
- * ---
- * --use-norandom
- * --use-random
- * --use-urandom
- * ---
- *
- * The default is `--use-urandom`; the first one should be used only when
- * the disk data have already been randomized by another process.
- */
-RandFile random_file = default_random_file;
-
-/**
- * randfileHandler handles `RandFile` options.
- * Params:
- *     option =    an option without argument: one of
- *                 `--use-random`, `--use-urandom`, `--use-norandom`.
- */
-void randfileHandler(string option)
-{
-    switch (option)
-    {
-      case "use-norandom": random_file = RandFile.None; break;
-      case "use-random": random_file = RandFile.Random; break;
-      case "use-urandom": random_file = RandFile.Urandom; break;
-      case "verbose|v": verbose += 1; break;
-      default :
-        stderr.writeln("Unknown random source ", option);
-        break;
-    }
-}
-
-immutable static string random_fmt = "Use %s as entropy source.";
-
-/// help for use-random option
-auto random_help = format!random_fmt(RandFile.Random);
-
-/// help for use-urandom option
-auto urandom_help = format!random_fmt(RandFile.Urandom);
-
-/// help for use-norandom option
-auto norandom_help = "Do not use any entropy source (use with care).";
 
 
 private immutable static VbLevel dflt_verbose = VbLevel.Warn;
@@ -175,13 +104,15 @@ immutable static string fake_help = "Disable any modification command.";
 /**
  * Print the parsed options and arguments.
  * Params:
+ *     Opts    = The types of the program-specific options.
  *     prog    = The program name.
  *     args    = The remaining positional arguments.
+ *     customOptions = The program-specific options.
  */
-void print_args(string prog, string[] args)
+void print_args(Opts...)(string prog, string[] args, Opts customOptions)
 {
     import std.stdio : stderr;
-    output_args!(tracef, stderr)(prog, args);
+    output_args!(tracef, stderr, Opts)(prog, args, customOptions);
 }
 
 
@@ -264,28 +195,47 @@ void optionHandler(string program_option, string value)
 
 /**
  * Print the parsed options and arguments to the specified output range.
+ *
+ * Each `Opt` type is expected to be a `named` template instance.
  * Params:
+ *     Opts   = The types of the program-specific options.
  *     uifun  = One of the ui `infof`, `tracef`, ... functions.
  *     output = An output range used to write the options and arguments.
  *     prog   = The program name.
  *     args   = The positional arguments.
+ *     customOptions = The program-specific options.
  */
-void output_args(alias uifun, alias output)(string prog, string[] args)
+void output_args(alias uifun, alias output, Opts...)(string prog, string[] args,
+                          Opts customOptions)
 if (is(typeof(output) == typeof(stderr)))
+in
 {
-    enum fmt = "%s is '%s'.\n";
+    static foreach(customOpt; customOptions)
+    {
+        static assert(__traits(compiles, customOpt.name));
+        static assert(__traits(compiles, customOpt.value));
+    }
+}
+do
+{
+    enum fmt = "  %s is '%s'.";
 
-    uifun("%s Options:\n", output, prog);
-    uifun(fmt, output, "passphrase", passphrase_file);
-    uifun(fmt, output, "random_file", random_file);
-    uifun(fmt, output, "exec_dirs", exec_dirs);
-    uifun(fmt, output, "options", options);
+    uifun("%s Options:", output, prog);
+
+    foreach(customOpt; customOptions)
+        uifun(fmt, output, customOpt.name, customOpt.value);
+
     uifun(fmt, output, "verbose", verbose);
     uifun(fmt, output, "fake", fake);
 
-    if (args.length >= 2)
-        uifun("Positional arguments:\n    %(%s\n    %)\n", output, args[1..$]);
+    auto positionalArgs = args
+        .filter!(a => a.length == 0 || a[0] != '-')()
+        .array;
+    if (positionalArgs.length)
+        uifun("Positional arguments:\n    %(%s\n    %)",
+              output, positionalArgs);
 }
+
 
 
 /// The exception raised when an error is found in program arguments.
