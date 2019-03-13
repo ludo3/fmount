@@ -22,7 +22,7 @@ import std.array : array, split;
 import std.conv : to;
 import std.file : dirEntries, exists, FileException, isDir, mkdir, readText,
                   remove, rmdir, SpanMode, write;
-import std.path : dirName, isAbsolute;
+import std.path : bn=baseName, dn=dirName, isAbsolute;
 import std.process : ProcessException;
 import std.regex : matchFirst, regex;
 import std.stdio : stderr;
@@ -93,7 +93,7 @@ private enum CreatedBy : string
 void ensure_mntdir_exists(S)(S path)
 if (isSomeString!S)
 {
-    assertDirExists(dirName(path));
+    assertDirExists(dn(path));
 
     if ( !exists(path) )
     {
@@ -139,11 +139,12 @@ if (isSomeString!S)
 
     if ((entries !is null) && entries.length == 1)
     {
-        if (entries[0] == CreatedBy.Fmount
-            || entries[0] == CreatedBy.Pmount)
+        auto entryName = bn(entries[0]);
+        if (entryName == CreatedBy.Fmount
+            || entryName == CreatedBy.Pmount)
         {
             autocreated = true;
-            auto autocreated_file = jn(path, entries[0]);
+            auto autocreated_file = entries[0];
 
             dbug("Removing ", autocreated_file);
             if (!fake)
