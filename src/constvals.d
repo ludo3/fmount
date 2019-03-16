@@ -229,3 +229,19 @@ struct With(string InstanceName)
 }
 
 
+/// The path to the `fstab` file.
+enum string FSTAB_PATH = "/etc/fstab";
+
+/**
+ * The regular expression pattern matching mass storage attributes in the
+ * `fstab` file.
+ */
+enum string FSTAB_ATTR_PATT = `^(?P<name>[A-Z]+)=(?P<attr>\S+)\s+(?P<mp>/\S+)`;
+
+/**
+ * The regular expression pattern matching mass storage paths in the
+ * `fstab` file.
+ */
+enum string FSTAB_DEVPATH_PATT = `^(?P<devPath>/\S+)\s+(?P<mp>/\S+)`;
+
+

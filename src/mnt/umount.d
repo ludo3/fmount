@@ -27,7 +27,7 @@ import argsutil : exec_dirs;
 import constvals : VbLevel;
 import dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev, is_encrypted;
 import luks : luksClose;
-import mnt.common : check_user, find_mountpoint,
+import mnt.common : check_user, find_mountpoint, is_in_fstab,
                     remove_automatically_created_dir;
 import osutil : get_exec_path, runCommand;
 import ui : dbugf, info_, infof, show_warnings, traceStack;
@@ -113,6 +113,11 @@ private void _do_unmount_nocrypt(string exec_prog,
                                  string disk,
                                  string mountpoint)
 {
+    if (is_in_fstab(disk))
+    {
+        // TODO if custom arguments are ever defined, disable them.
+    }
+
     auto args = [exec_prog, dev_path(disk)];
     runCommand(args);
     remove_automatically_created_dir(mountpoint);

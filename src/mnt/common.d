@@ -35,7 +35,7 @@ import constvals : how_to_run_as_root;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
 import dutil : printThChain;
 import osutil : assertDirExists, jn;
-import ui : dbug, dbugf, error, errorf, info_, trace, tracef, warning,
+import ui : dbug, dbugf, error, errorf, info_, trace, tracef, warn,
             WithPrefix;
 
 
@@ -264,6 +264,371 @@ string find_mountpoint(string device, string dflt="")
 
 
 /**
+ * Check that the requested device is not in `/etc/fstab`, in which case custom
+ * options must be disabled, letting `mount` and `umount` work as usual.
+ *
+ * Params:
+ *     S      = A string type.
+ *     device = A path to a block device.
+ *     prog   = The program name.
+ */
+bool is_in_fstab(S)(S device)
+if (isSomeString!S)
+{
+    auto mp = get_fstab_mountpoint(device);
+    return mp !is null && mp.length > 0;
+}
+
+/**
+ * Check that the requested device is not in `/etc/fstab`, in which case custom
+ * options must be disabled, letting `mount` and `umount` work as usual.
+ *
+ * Params:
+ *     S      = A string type.
+ *     device = A path to a block device.
+ *     prog   = The program name.
+ */
+S get_fstab_mountpoint(S)(S device)
+if (isSomeString!S)
+{
+    import std.functional : toDelegate;
+    import constvals : FSTAB_PATH;
+
+    alias devPath = dev_path!S;
+    alias devLinkPaths = dev_link_paths!S;
+
+    return _fstab_mp!S(device,
+                       FSTAB_PATH,
+                       toDelegate(&devPath),
+                       toDelegate(&devLinkPaths));
+    /+
+    import std.algorithm.searching : startsWith;
+    import std.path : dn=dirName;
+    import std.regex : regex, matchFirst;
+    import std.stdio: File;
+    import std.string : toLower, toUpper;
+    import std.range.primitives : ElementType;
+    import std.traits: Unqual;
+
+    import constvals : FSTAB_ATTR_PATT, FSTAB_PATH;
+
+    alias Char = Unqual!(ElementType!S);
+    enum string fstab_path = FSTAB_PATH;
+
+    Char[] buf;
+    auto fstab = File(fstab_path);
+    auto attrRx = regex(to!(Char[])(FSTAB_ATTR_PATT));
+    while (fstab.readln(buf))
+    {
+        auto m = matchFirst(buf, attrRx);
+        if (m)
+        {
+            S buf2 = to!S(buf.idup);
+            string fstDirName = "by-" ~ buf2;
+            auto fstLinkName = m["attr"];
+
+            foreach (path; [dev_path(device)] ~ dev_link_paths(device))
+            {
+                string dir_name = dn(path);
+                string name = bn(path);
+                if (dir_name == fstDirName && name == to!string(fstLinkName))
+                    return true;
+            }
+        }
+        else foreach (path; [dev_path(device)] ~ dev_link_paths(device))
+        {
+            if (to!string(buf).startsWith(path))
+            {
+                if (path == device)
+                    tracef("%s is in %s", device, fstab_path);
+                else
+                    tracef("%s(%s) is in %s", device, path, fstab_path);
+
+                return true;
+            }
+        }
+    }
+
+    dbugf("%s is not in %s", device, fstab_path);
+    return false;
+    +/
+}
+
+private S _fstab_mp(S)(S device, string fstab_path,
+                       S delegate(S dev_or_lnk) getPath,
+                       S[] delegate(S dev, S[] dirs = []) getLnkPaths)
+if (isSomeString!S && isSomeString!(typeof(fstab_path)))
+{
+    import std.algorithm.searching : startsWith;
+    import std.path : dn=dirName;
+    import std.regex : regex, matchFirst;
+    import std.stdio: File;
+    import std.string : toLower, toUpper;
+    import std.range.primitives : ElementType;
+    import std.traits: Unqual;
+
+    import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT;
+
+    alias Char = Unqual!(ElementType!S);
+
+    Char[] buf;
+    auto fstab = File(fstab_path);
+    auto attrRx = regex(to!(Char[])(FSTAB_ATTR_PATT));
+    auto pathRx = regex(to!(Char[])(FSTAB_DEVPATH_PATT));
+
+    while (fstab.readln(buf))
+    {
+        auto m = matchFirst(buf, attrRx);
+        if (m)
+        {
+            auto attrName = m["name"];
+            immutable string fstDirName = "by-" ~ to!string(attrName).toLower();
+            auto fstLinkName = m["attr"];
+
+            foreach (path; [getPath(device)] ~ getLnkPaths(device))
+            {
+                immutable string dir_name = bn(dn(path));
+                immutable string name = bn(path);
+
+                if (dir_name == fstDirName && name == to!string(fstLinkName))
+                {
+                    S mp = to!S(m["mp"]);
+                    tracef("%s (%s=%s) is in %s => %s",
+                           device, attrName, fstLinkName, fstab_path, mp);
+                    return mp;
+                }
+            }
+        }
+        else
+        {
+            m = matchFirst(buf, pathRx);
+            if (m)
+            {
+                immutable fstDevPath = to!S(m["devPath"]);
+                foreach (path; [getPath(device)] ~ getLnkPaths(device))
+                {
+                    if (path == fstDevPath)
+                    {
+                        S mp = to!S(m["mp"]);
+
+                        if (path == device)
+                            tracef("%s is in %s => %s", device, fstab_path, mp);
+                        else
+                            tracef("%s(%s) is in %s => %s",
+                                   device, path, fstab_path, mp);
+
+                        return mp;
+                    }
+                }
+            }
+        }
+    }
+
+    dbugf("%s is not in %s", device, fstab_path);
+    return "";
+}
+
+unittest
+{
+    import std.format : _f = format;
+    import std.regex : matchFirst;
+    import argsutil : verbose;
+    import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT, VbLevel;
+    import dutil : srcln, unused;
+    import osutil : removeIfExists;
+    import tempfile : NamedTemporaryFile;
+    import ui : dbug;
+
+    verbose = VbLevel.Dbug;
+
+    immutable attrLine = "UUID=076373AA55FCD80F /mnt/fstab_test    ntfs    " ~
+        "nodiratime,relatime,user,noauto     0       2\n";
+    immutable pathLine = "/dev/disk/by-uuid/076373AA55FCD80F " ~
+        "/mnt/fstab_test    ntfs    nodiratime,relatime,user,noauto" ~
+        "     0       2\n";
+
+    auto mA = matchFirst(attrLine, FSTAB_ATTR_PATT);
+    auto mP = matchFirst(pathLine, FSTAB_DEVPATH_PATT);
+
+    assert(mA);
+    assert(mA["name"] == "UUID");
+    assert(mA["attr"] == "076373AA55FCD80F");
+    assert(mA["mp"] == "/mnt/fstab_test");
+
+    assert(mP);
+    assert(mP["devPath"] == "/dev/disk/by-uuid/076373AA55FCD80F");
+    assert(mP["mp"] == "/mnt/fstab_test");
+
+    dbug("fstab unittests ok, to be improved");
+
+
+    string mockPath(alias string path)(string) { return path; }
+
+    template mockLnkPaths(lnks...)
+    {
+        static foreach(i, lnk; lnks)
+        {
+            static assert(!is(lnk), _f!"lnks[%d] is %s"( i, lnk.stringof));
+            static assert(isSomeString!(typeof(lnk)),
+                          _f!"typeof(lnks[%d]) is not some string: %s"
+                             (i, lnk.stringof));
+        }
+
+        string[] mockLnkPaths(string dev, string[] dirs = [])
+        {
+            unused(dev);
+            unused(dirs);
+
+            static if (lnks.length == 1)
+                return [lnks[0]];
+            else
+                return lnks.array;
+        }
+    }
+
+    void test_fstab(alias expectedMountPoint,
+                    alias fstabContent,
+                    alias devPath,
+                    alias devOrLnkPaths,
+                    string file=__FILE__,
+                    size_t line=__LINE__)()
+    if (isSomeString!(typeof(expectedMountPoint)) &&
+        isSomeString!(typeof(fstabContent)) &&
+        isSomeString!(typeof(devPath)))
+    in
+    {
+        import std.format : _f=format;
+        import std.typecons: isTuple, Tuple;
+
+        alias LnkType = typeof(devOrLnkPaths);
+        static if (!isSomeString!LnkType)
+        {
+            static assert(isTuple!(LnkType),
+                          _f!"devOrLnkPaths type is '%s' instead of tuple"
+                             (LnkType.stringof));
+            static foreach(i; 0..LnkType.Types.length)
+                static assert(isSomeString!(LnkType.Types[i]),
+                    _f!("Among '%s': devOrLnkPaths[%d] type is '%s' instead of"
+                      ~ " some string")(LnkType.Types.stringof, i,
+                                        LnkType.Types[i].stringof));
+        }
+    }
+    do
+    {
+        auto tempfstab = new NamedTemporaryFile("fstab", ".tmp");
+        scope(exit)
+            removeIfExists(tempfstab.name);
+        tempfstab.writeln(fstabContent);
+        tempfstab.flush();
+
+        static if (isSomeString!(typeof(devOrLnkPaths)))
+            string mp =
+                _fstab_mp(devPath, tempfstab.name,
+                          &mockPath!devPath,
+                          &mockLnkPaths!(devOrLnkPaths));
+        else
+            string mp =
+                _fstab_mp(devPath, tempfstab.name,
+                          &mockPath!devPath,
+                          &mockLnkPaths!(devOrLnkPaths.expand));
+
+        assert(mp == expectedMountPoint,
+               _f!"fstab mountpoint is '%s'\nfstab tested here:\n@%s(%d)"
+                 (mp, file, line));
+    }
+
+    test_fstab!("/mnt/myUsbKey", `
+ID=usb-Innostor_Innostor_000000000000000176-0:0-part1    /mnt/myUsbKey`,
+        "/dev/sdc1",
+        "/dev/disk/by-id/usb-Innostor_Innostor_000000000000000176-0:0-part1")
+        ();
+
+    test_fstab!("/mnt/RemovableDisk",
+                "LABEL=UserDisk    /mnt/RemovableDisk",
+                "/dev/sdc1",
+                "/dev/disk/by-label/UserDisk")
+        ();
+
+    test_fstab!("/mnt/MyDisk",
+                "PARTUUID=UserDisk    /mnt/MyDisk",
+                "/dev/sdc1",
+                "/dev/disk/by-partuuid/UserDisk")
+        ();
+
+    test_fstab!("/mnt/MyDiskByPath",
+                "PATH=UsrDisk    /mnt/MyDiskByPath",
+                "/dev/sdb1",
+                "/dev/disk/by-path/UsrDisk")
+        ();
+
+    test_fstab!("/mnt/InternalDrive",
+                "UUID=076373AA55FCD80F    /mnt/InternalDrive",
+                "/dev/sda3",
+                "/dev/disk/by-uuid/076373AA55FCD80F")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "UUID=SimpleNTFS    /mnt/anotherUsbKey",
+                "/dev/sde2",
+                "/dev/disk/by-label/SimpleNTFS")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "LABEL=076373AA55FCD80F    /mnt/yetAnotherUsbKey",
+                "/dev/sdg7",
+                "/dev/disk/by-uuid/076373AA55FCD80F")
+        ();
+
+    test_fstab!("/mnt/eightthDisk",
+                "NEWKEY=someValue1234567    /mnt/eightthDisk",
+                "/dev/sdh4",
+                "/dev/disk/by-newkey/someValue1234567")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "NEWKEY=someValue1234567    /mnt/yetAnotherUsbKey2",
+                "/dev/sde12",
+                "/dev/disk/by-label/someValue1234567")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "LABEL=someValue1234567    /mnt/yetAnotherUsbKey3",
+                "/dev/sdg7",
+                "/dev/disk/by-newkey/someValue1234567")
+        ();
+
+    test_fstab!("/mnt/ninethDisk",
+                "/dev/sdi2    /mnt/ninethDisk",
+                "/dev/sdi2",
+                "/dev/disk/by-anything/xxxxxxx")
+        ();
+
+    test_fstab!("/mnt/tenthDisk",
+                "/dev/disk/by-label/disk10    /mnt/tenthDisk",
+                "/dev/sdj0",
+                "/dev/disk/by-label/disk10")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "/dev/sdk1    /mnt/eleventhDisk",
+                "/dev/sdk11",
+                "/dev/disk/by-anything/xxxxxxx")
+        ();
+
+    // mismatch
+    test_fstab!("",
+                "/dev/disk/by-uuid/01234567EA    /mnt/eleventhDisk",
+                "/dev/sdl12",
+                "/dev/disk/by-uuid/01234567FD")
+        ();
+}
+
+/**
  * Check that the program is run as root, either from sudo or super, or with
  * setuid bit set.
  *
@@ -327,7 +692,7 @@ if (isSomeString!S)
 
             // if the user is really root, only warn about fixed device;
             // otherwise the action is forbidden.
-            warning("The device ", device, " is not removable.");
+            warn("The device ", device, " is not removable.");
             if (real_user == "root:root")
                 return;
         }

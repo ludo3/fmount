@@ -202,7 +202,7 @@ if (isInputRange!Strings &&
      isSomeChar!(ElementType!(ElementType!Strings))))
 {
     if (verbose >= minVbLevel)
-        warning(messages.join("\n"));
+        warn(messages.join("\n"));
 }
 
 
@@ -282,28 +282,34 @@ template vbFuns(VbLevel vl)
        dbug(486, "is an integer number");
        --------------------
     */
-    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes,
+                string file=__FILE__, size_t line=__LINE__,
+                A...)
                (File output, lazy A args)
     if (args.length > 0 && !is(A[0] == bool))
     {
         if (verbose >= vl)
         {
             auto writer = output.lockingTextWriter();
+            alias W = typeof(writer);
             // FIXME should be possible to remove need for typeof(writer)
-            doVbImplw!(typeof(writer), prefix, A)(writer, args);
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
         }
     }
 
     /// Ditto
-    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)(lazy A args)
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes,
+                string file=__FILE__, size_t line=__LINE__,
+                A...)(lazy A args)
     if (args.length > 0 && !is(A[0] == bool) && !is(A[0] == File) &&
         !isOutRChar!(A[0]))
     {
         if (verbose >= vl)
         {
             auto writer = dfltOut.lockingTextWriter();
+            alias W = typeof(writer);
             // FIXME should be possible to remove need for typeof(writer)
-            doVbImplw!(typeof(writer), prefix, A)(writer, args);
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
         }
     }
 
@@ -327,14 +333,29 @@ template vbFuns(VbLevel vl)
        dbug(486, "is an integer number");
        --------------------
     */
-    void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplw(W,
+                 WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (W writer, lazy A args)
     if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
         isOutRChar!W)
     {
         if (verbose >= vl)
-            doVbImplw!(W, prefix, A)(writer, args);
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
     }
+
+    // No verbose test, done before calling this function.
+    private void doVbImplw(W, WithPrefix prefix, A...)
+                          (string file, size_t line, W writer, lazy A args)
+    if (args.length > 0 && !is(A[0] == bool) && isOutRChar!W)
+    {
+        static if (vl == VbLevel.Dbug)
+            formattedWrite!"%s(%d): "(writer, file, line);
+
+        doVbImplw!(W, prefix, A)(writer, args);
+    }
+
 
     // No verbose test, done before calling this function.
     private void doVbImplw(W, WithPrefix prefix, A...)
@@ -372,25 +393,31 @@ template vbFuns(VbLevel vl)
        dbug(false, 876, "is an integer number");
        --------------------
     */
-    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes,
+                string file=__FILE__, size_t line=__LINE__,
+                A...)
                (File output, lazy bool condition, lazy A args)
     {
         if (verbose >= vl && condition)
         {
             auto writer = output.lockingTextWriter();
+            alias W = typeof(writer);
             // FIXME should be possible to remove need for typeof(writer)
-            doVbImplw!(typeof(writer), prefix, A)(writer, args);        }
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
+        }
     }
 
     /// Ditto
-    void vbImpl(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImpl(WithPrefix prefix=WithPrefix.Yes,
+                string file=__FILE__, size_t line=__LINE__,
+                A...)
                (lazy bool condition, lazy A args)
     {
         if (verbose >= vl && condition)
         {
             auto writer = dfltOut.lockingTextWriter();
-            // FIXME should be possible to remove need for typeof(writer)
-            doVbImplw!(typeof(writer), prefix, A)(writer, args);
+            alias W = typeof(writer);
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
         }
     }
 
@@ -416,13 +443,15 @@ template vbFuns(VbLevel vl)
        dbug(486, "is an integer number");
        --------------------
     */
-    void vbImplw(W, WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplw(W, WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (W writer, lazy bool condition, lazy A args)
     if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
         isOutRChar!W)
     {
         if (verbose >= vl && condition)
-            doVbImplw!(W, prefix, A)(writer, args);
+            doVbImplw!(W, prefix, A)(file, line, writer, args);
     }
 
     /**
@@ -451,7 +480,8 @@ template vbFuns(VbLevel vl)
         if (verbose >= vl)
         {
             auto writer = output.lockingTextWriter();
-            vbStackw!(typeof(writer), prefix)(writer, throwable);
+            alias W = typeof(writer);
+            vbStackw!(W, prefix)(writer, throwable);
         }
     }
 
@@ -461,7 +491,8 @@ template vbFuns(VbLevel vl)
         if (verbose >= vl)
         {
             auto writer = dfltOut.lockingTextWriter();
-            vbStackw!(typeof(writer), prefix)(writer, throwable);
+            alias W = typeof(writer);
+            vbStackw!(W, prefix)(writer, throwable);
         }
     }
 
@@ -490,7 +521,7 @@ template vbFuns(VbLevel vl)
         {
             // Note https://tour.dlang.org/tour/en/gems/opdispatch-opapply
             foreach(Throwable inChain; throwable)
-                doVbImplw!(typeof(writer), prefix, Throwable)(writer, inChain);
+                doVbImplw!(W, prefix, Throwable)(writer, inChain);
         }
     }
 
@@ -517,25 +548,31 @@ template vbFuns(VbLevel vl)
        dbugf("%d is an integer number", 876);
        --------------------
     */
-    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (lazy string msg, File output, lazy A args)
     {
         if (verbose >= vl)
         {
             auto writer = output.lockingTextWriter();
-            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+            alias W = typeof(writer);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
         }
     }
 
     /// Ditto
-    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (lazy string msg, lazy A args)
     if (A.length > 0 && !is(A[0] == File) && !is(A[0] == bool))
     {
         if (verbose >= vl)
         {
             auto writer = dfltOut.lockingTextWriter();
-            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+            alias W = typeof(writer);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
         }
     }
 
@@ -561,21 +598,27 @@ template vbFuns(VbLevel vl)
        dbug(486, "is an integer number");
        --------------------
     */
-    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes,
+                  string file=__FILE__, size_t line=__LINE__,
+                  A...)
                  (lazy string msg, W writer, lazy A args)
     if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
         isOutRChar!W && !is(W == typeof(dfltOut)))
     {
         if (verbose >= vl)
-            doVbImplwf!(W, prefix, A)(msg, writer, args);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
     }
 
     // No verbose test, done before calling this function.
     private void doVbImplwf(W, WithPrefix prefix, A...)
-                           (lazy string msg, W writer, lazy A args)
+                           (lazy string file, lazy size_t line,
+                            lazy string msg, W writer, lazy A args)
     if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
         isOutRChar!W && !is(W == typeof(dfltOut)))
     {
+        static if (vl == VbLevel.Dbug)
+            formattedWrite!"%s(%d): "(writer, file, line);
+
         if (prefix == WithPrefix.Yes)
             formattedWrite!"%s"(writer, vbPrefix!vl);
 
@@ -608,25 +651,31 @@ template vbFuns(VbLevel vl)
        dbugf(false, "%d is an integer number", 876);
        --------------------
     */
-    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (lazy bool condition, lazy string msg, File output, lazy A args)
     {
         if (verbose >= vl && condition)
         {
             auto writer = output.lockingTextWriter();
-            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+            alias W = typeof(writer);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
         }
     }
 
     /// Ditto
-    void vbImplf(WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplf(WithPrefix prefix=WithPrefix.Yes,
+                 string file=__FILE__, size_t line=__LINE__,
+                 A...)
                 (lazy bool condition, lazy string msg, lazy A args)
     if (A.length > 0 && !is(A[0] == File))
     {
         if (verbose >= vl && condition)
         {
             auto writer = dfltOut.lockingTextWriter();
-            doVbImplwf!(typeof(writer), prefix, A)(msg, writer, args);
+            alias W = typeof(writer);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
         }
     }
 
@@ -653,13 +702,15 @@ template vbFuns(VbLevel vl)
        dbug(486, "is an integer number");
        --------------------
     */
-    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes, A...)
+    void vbImplwf(W, WithPrefix prefix=WithPrefix.Yes,
+                  string file=__FILE__, size_t line=__LINE__,
+                  A...)
                  (lazy bool condition, lazy string msg, W writer, lazy A args)
     if ((args.length == 0 || (args.length > 0 && !is(A[0] == bool))) &&
         isOutRChar!W && !is(W == typeof(dfltOut)))
     {
         if (verbose >= vl && condition)
-            doVbImplwf!(W, prefix, A)(msg, writer, args);
+            doVbImplwf!(W, prefix, A)(file, line, msg, writer, args);
     }
 }
 
@@ -676,9 +727,9 @@ alias info_ = vbFuns!(VbLevel.Info).vbImpl;
 /// Ditto
 alias infof = vbFuns!(VbLevel.Info).vbImplf;
 /// Ditto
-alias warning = vbFuns!(VbLevel.Warn).vbImpl;
+alias warn = vbFuns!(VbLevel.Warn).vbImpl;
 /// Ditto
-alias warningf = vbFuns!(VbLevel.Warn).vbImplf;
+alias warnf = vbFuns!(VbLevel.Warn).vbImplf;
 /// Ditto
 alias error = vbFuns!(VbLevel.None).vbImpl;
 /// Ditto
@@ -697,9 +748,9 @@ alias infow = vbFuns!(VbLevel.Info).vbImplw;
 /// Ditto
 alias infowf = vbFuns!(VbLevel.Info).vbImplwf;
 /// Ditto
-alias warningw = vbFuns!(VbLevel.Warn).vbImplw;
+alias warnw = vbFuns!(VbLevel.Warn).vbImplw;
 /// Ditto
-alias warningwf = vbFuns!(VbLevel.Warn).vbImplwf;
+alias warnwf = vbFuns!(VbLevel.Warn).vbImplwf;
 /// Ditto
 alias errorw = vbFuns!(VbLevel.None).vbImplw;
 /// Ditto

@@ -161,7 +161,9 @@ if (isSomeString!S)
     {
         p = readLink(path);
         if (!isAbsolute(p))
-            p = jn(dn(path), p);
+        {
+            p = absolutePath(jn(dn(path), p));
+        }
     }
 
     return buildNormalizedPath(p);
@@ -361,7 +363,6 @@ if (isSomeString!S)
         linksCat ~= lnks;
     }
 
-    dbugf("dev_link_paths : linksCat = %(%s, %)", linksCat.data);
     return linksCat.data;
 }
 

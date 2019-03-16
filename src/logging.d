@@ -1202,7 +1202,10 @@ unittest
 }
 
 
+// TODO documentation for version(FormattedFileLoggerTests)
+
 /// Formatting
+version(FormattedFileLoggerTests)
 unittest
 {
     import core.time : Duration, days, hours, minutes, seconds, msecs,

@@ -36,9 +36,10 @@ import dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
 import dutil : printThChain;
 import luks : luksOpen, luksClose;
 import mnt.common : check_user, ensure_mntdir_exists, find_mountpoint,
-                    get_expected_mountpoint, remove_automatically_created_dir;
+                    get_expected_mountpoint, get_fstab_mountpoint,
+                    remove_automatically_created_dir;
 import osutil : get_exec_path, runCommand;
-import ui : dbugf, infof, read_password, show_warnings, traceStack;
+import ui : dbugf, infof, read_password, show_warnings, traceStack, warnf;
 
 
 /**
@@ -193,7 +194,7 @@ private string[] filteroutOverridenOpts(string newOption, string[] currOptions)
 /**
  * Parse the mount options and translate them for pmount or mount.
  */
-private immutable(string[]) _get_mount_opts(string dev_file_system)
+private string[] _get_mount_opts(string dev_file_system)
 {
     string[] mount_opts = [];
     string[] comma_sep_opts = [];
@@ -250,7 +251,7 @@ private immutable(string[]) _get_mount_opts(string dev_file_system)
         res ~= s.idup;
     +/
     // = comma_sep_opts.map!(a => a.idup)().array;
-    return mount_opts.idup;
+    return mount_opts;
 }
 
 
@@ -261,12 +262,29 @@ private void _do_mount_nocrypt(string exec_prog,
                                string disk,
                                string mountpoint)
 {
+    import std.conv : to;
+
     ensure_mntdir_exists(mountpoint);
     scope(failure) remove_automatically_created_dir(mountpoint);
 
-    immutable mount_opts = _get_mount_opts(dev_fs(disk));
+    string[] mount_opts;
+    auto fstab_mountpoint = get_fstab_mountpoint(disk);
+    string mp = mountpoint;
 
-    auto args = [exec_prog] ~ mount_opts ~ [dev_path(disk), mountpoint];
+    if (fstab_mountpoint !is null && fstab_mountpoint.length > 0)
+    {
+        mp = to!string(fstab_mountpoint);
+
+        if (mp != mountpoint)
+            warnf("Using fstab mountpoint '%s' instead of '%s'",
+                  fstab_mountpoint, mountpoint);
+    }
+    else
+    {
+        mount_opts = _get_mount_opts(dev_fs(disk));
+    }
+
+    auto args = [exec_prog] ~ mount_opts ~ [dev_path(disk), mp];
     runCommand(args);
 }
 
