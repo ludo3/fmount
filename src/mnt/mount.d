@@ -264,9 +264,6 @@ private void _do_mount_nocrypt(string exec_prog,
 {
     import std.conv : to;
 
-    ensure_mntdir_exists(mountpoint);
-    scope(failure) remove_automatically_created_dir(mountpoint);
-
     string[] mount_opts;
     auto fstab_mountpoint = get_fstab_mountpoint(disk);
     string mp = mountpoint;
@@ -283,6 +280,9 @@ private void _do_mount_nocrypt(string exec_prog,
     {
         mount_opts = _get_mount_opts(dev_fs(disk));
     }
+
+    ensure_mntdir_exists(mp);
+    scope(failure) remove_automatically_created_dir(mp);
 
     auto args = [exec_prog] ~ mount_opts ~ [dev_path(disk), mp];
     runCommand(args);
