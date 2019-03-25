@@ -21,7 +21,9 @@ module run;
 import std.getopt : GetOptException, GetoptResult, getopt;
 import std.stdio : writeln;
 
-import argsutil : check_exec_dirs, print_args, VbLevel, verbose;
+import appargs : check_exec_dirs, verbose;
+import argsutil : print_args;
+import constvals : VbLevel;
 import dutil : printThChain;
 import ui : info_;
 

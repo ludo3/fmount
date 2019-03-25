@@ -30,8 +30,8 @@ import std.string : format;
 import std.traits : isSomeString;
 
 import appconfig;
-import argsutil : fake, VbLevel, verbose;
-import constvals : how_to_run_as_root;
+import appargs : fake, verbose;
+import constvals : how_to_run_as_root, VbLevel;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
 import dutil : printThChain;
 import osutil : assertDirExists, jn;
@@ -59,7 +59,7 @@ if (isSomeString!S)
     if (isAbsolute(mountname))
         return mountname;
 
-    S root = get_mountroot();
+    S root = getRoot();
     return jn(root, mountname);
 }
 
@@ -139,7 +139,7 @@ if (isSomeString!S)
 
     if ((entries !is null) && entries.length == 1)
     {
-        auto entryName = bn(entries[0]);
+        immutable entryName = bn(entries[0]);
         if (entryName == CreatedBy.Fmount
             || entryName == CreatedBy.Pmount)
         {
@@ -301,57 +301,6 @@ if (isSomeString!S)
                        FSTAB_PATH,
                        toDelegate(&devPath),
                        toDelegate(&devLinkPaths));
-    /+
-    import std.algorithm.searching : startsWith;
-    import std.path : dn=dirName;
-    import std.regex : regex, matchFirst;
-    import std.stdio: File;
-    import std.string : toLower, toUpper;
-    import std.range.primitives : ElementType;
-    import std.traits: Unqual;
-
-    import constvals : FSTAB_ATTR_PATT, FSTAB_PATH;
-
-    alias Char = Unqual!(ElementType!S);
-    enum string fstab_path = FSTAB_PATH;
-
-    Char[] buf;
-    auto fstab = File(fstab_path);
-    auto attrRx = regex(to!(Char[])(FSTAB_ATTR_PATT));
-    while (fstab.readln(buf))
-    {
-        auto m = matchFirst(buf, attrRx);
-        if (m)
-        {
-            S buf2 = to!S(buf.idup);
-            string fstDirName = "by-" ~ buf2;
-            auto fstLinkName = m["attr"];
-
-            foreach (path; [dev_path(device)] ~ dev_link_paths(device))
-            {
-                string dir_name = dn(path);
-                string name = bn(path);
-                if (dir_name == fstDirName && name == to!string(fstLinkName))
-                    return true;
-            }
-        }
-        else foreach (path; [dev_path(device)] ~ dev_link_paths(device))
-        {
-            if (to!string(buf).startsWith(path))
-            {
-                if (path == device)
-                    tracef("%s is in %s", device, fstab_path);
-                else
-                    tracef("%s(%s) is in %s", device, path, fstab_path);
-
-                return true;
-            }
-        }
-    }
-
-    dbugf("%s is not in %s", device, fstab_path);
-    return false;
-    +/
 }
 
 private S _fstab_mp(S)(S device, string fstab_path,
@@ -432,14 +381,14 @@ unittest
 {
     import std.format : _f = format;
     import std.regex : matchFirst;
-    import argsutil : verbose;
+    import appargs : verbose;
     import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT, VbLevel;
     import dutil : srcln, unused;
     import osutil : removeIfExists;
     import tempfile : NamedTemporaryFile;
     import ui : dbug;
 
-    verbose = VbLevel.Dbug;
+    //verbose = VbLevel.Dbug;
 
     immutable attrLine = "UUID=076373AA55FCD80F /mnt/fstab_test    ntfs    " ~
         "nodiratime,relatime,user,noauto     0       2\n";

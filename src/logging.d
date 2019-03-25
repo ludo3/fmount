@@ -21,6 +21,9 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
 module logging;
+
+import core.stdc.stdlib : exit;
+
 import std.array : array, join;
 import std.conv : to;
 import std.datetime.date : Date, DateTime, TimeOfDay;
@@ -33,10 +36,10 @@ import std.stdio : File, LockingTextReader, stderr, writeln;
 import std.traits: EnumMembers, hasMember,
                    isAssignable, isOrderingComparable, isSomeString;
 
-import argsutil : VbLevel, verbose;
+import appargs : verbose;
+import constvals : VbLevel;
 import dateutil : approxNow;
 import dutil: /+mkGlob,+/ RW, srcinfo, SrcInfo, unused;
-import core.stdc.stdlib : exit;
 
 /**
    Retrieve the name of the log file.

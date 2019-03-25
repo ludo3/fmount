@@ -21,8 +21,9 @@ import std.path : dirName;
 import std.stdio : writefln;
 import std.string : indexOf;
 
-import argsutil : VbLevel, verbose;
-import sdlang : parseFile, parseSource, SDLangException, Tag;
+import appargs : verbose;
+import constvals : VbLevel;
+import sdlang : parseFile, parseSource, SDLangException, Tag, Value;
 
 
 /**
@@ -116,6 +117,35 @@ class Config
             }
 
             return getInCfg!T(&getValueImpl, defaultValue);
+        }
+
+        /**
+         * Retrieve the named configuration values with the specified type.
+         */
+        T[] getValues(T)(string name, T[] defaultValues = [])
+        {
+            ensureParsed();
+
+            T[] getValuesImpl(Tag tag)
+            {
+                Value[] tagVals = tag.getTagValues(name);
+                if (tagVals != null)
+                {
+                    T[] values;
+
+                    foreach (tv; tagVals)
+                    {
+                        if (tv.type == typeid(T))
+                            values ~= tv.get!T();
+                    }
+
+                    return values;
+                }
+
+                return defaultValues;
+            }
+
+            return getInCfg!(T[])(&getValuesImpl, defaultValues);
         }
 
         /**
@@ -503,10 +533,10 @@ sub4 sv4="four" {
 // default configuration test: missing configuration file, missing subconfig.
 unittest
 {
-    import osutil : jn, removeIfExists;
+    import osutil : get_dir, jn, removeIfExists;
     import std.file : deleteme, write;
 
-    immutable config_file = jn(deleteme, "app.dfltSubCfg.conf");
+    immutable config_file = jn(get_dir(deleteme), "app.dfltSubCfg.conf");
     auto cfg = new Config();
 
     enum DFLT_CONFIG = `
@@ -547,5 +577,17 @@ unittest
     // Missing subconfig in configuration file
     doTest();
 
+}
+
+// Source order test
+unittest
+{
+    auto cfg = new Config();
+    cfg.addSource(`
+                    stringConf "userValue"`);
+    cfg.addSource(`
+                    stringConf "adminValue"`);
+    string stringConf = cfg.getValue("stringConf", "not set");
+    assert(stringConf == "userValue", "stringConf is " ~ stringConf);
 }
 

@@ -18,21 +18,22 @@ module osutil;
 
 import core.stdc.errno : ENOENT, ENOTDIR;
 import std.conv : parse, text, to;
-import std.file : exists, isDir, mkdirRecurse, readText, remove,
+import std.file : exists, isDir, mkdirRecurse, readText, remove, rmdirRecurse,
                   setAttributes, FileException;
+import std.format : _f = format;
 import std.path : dirSeparator, expandTilde, pathSeparator;
 import std.process : environment, execute, executeShell, ProcessException,
                      thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
 import std.regex : Regex, regex, split;
-import std.stdio : File, stderr, writeln;
-import std.string : format, indexOf, join, split, strip, tr;
+import std.stdio : File, stderr, writefln, writeln;
+import std.string : indexOf, join, split, strip, tr;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
 
-import argsutil;
+import appargs : fake, verbose;
 import constvals : ModePrivateRWX, VbLevel;
-import ui : trace, tracef;
+import ui : info_, infof, trace, tracef;
 
 
 /**
@@ -85,13 +86,13 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
         {
             if (expanded_path != path)
             {
-                string fmt = "Creating directory %s => %s";
-                writeln(format(fmt, path, expanded_path));
+                enum string fmt = "Creating directory %s => %s";
+                trace(_f!fmt(path, expanded_path));
             }
             else
             {
-                string fmt = "Creating directory %s";
-                writeln(format(fmt, path));
+                enum string fmt = "Creating directory %s";
+                trace(_f!fmt(path));
             }
         }
 
@@ -104,8 +105,8 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
     }
     else if (!isDir(expanded_path))
     {
-        string msg = "The path %s is not a directory";
-        throw new FileException(expanded_path, msg.format(expanded_path));
+        enum string msg = "The path %s is not a directory";
+        throw new FileException(expanded_path, _f!msg(expanded_path));
     }
 
     if (getEffectiveUserAndGroup() == "root:root")
@@ -135,7 +136,7 @@ private string getSomeUserAndGroup(string fmt)
     import std.string : strip;
 
     immutable usergroup =
-        runCommand(format!"ps --no-headers -n -o%s %d"(fmt, thisProcessID));
+        runCommand(_f!"ps --no-headers -n -o%s %d"(fmt, thisProcessID));
 
     immutable arr = usergroup.strip.split(spaces).idup;
 
@@ -149,14 +150,13 @@ private string getSomeUserAndGroup(string fmt)
         return (p is null || !_knownFormats[fmt]);
     }
 
+    string result = arr.join(":");
+
     if (isFirstCall(fmt))
-    {
-        if (verbose >= VbLevel.More)
-            writeln(fmt, "=", join(arr, ":"));
-    }
+        trace(fmt, "=", arr.join(":"));
     //TODO create logOnce(statement) and logOnce(name, statement) dutil functions
 
-    return join(arr, ":");
+    return result;
 }
 
 /**
@@ -171,6 +171,13 @@ string getEffectiveUserAndGroup()
     return getSomeUserAndGroup("euser,egroup");
 }
 
+private string _realUserAndGroup;
+
+static this()
+{
+    _realUserAndGroup = getSomeUserAndGroup("ruser,rgroup");
+}
+
 /**
  * Retrieve the current real user and real group of the running process.
  *
@@ -179,58 +186,61 @@ string getEffectiveUserAndGroup()
  */
 string getRealUserAndGroup()
 {
-    /++
-     FIXME
-       sudo sh -c set
-            COLORTERM='truecolor'
-            DISPLAY=':0.0'
-            HOME='/root'
-            IFS='
-            '
-            LANG='fr_FR.UTF-8'
-            LC_CTYPE='fr_FR.UTF-8'
-            LOGNAME='root'
-            LS_COLORS='rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:'
-            MAIL='/var/mail/root'
-            OPTIND='1'
-            PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-            PPID='23386'
-            PS1='# '
-            PS2='> '
-            PS4='+ '
-            PWD='/home/ludo/Documents/work/dev/dlang/fmount'
-            SHELL='/bin/bash'
-            SUDO_COMMAND='/bin/sh -c set'
-            SUDO_GID='1000'
-            SUDO_UID='1000'
-            SUDO_USER='ludo'
-            TERM='xterm-256color'
-            USER='root'
-            USERNAME='root'
-            XAUTHORITY='/home/ludo/.Xauthority'
-       super set
-            CALLER='ludo'
-            CALLER_HOME='/home/ludo'
-            HOME='/root'
-            IFS='
-            '
-            LOGNAME='root'
-            OPTIND='1'
-            ORIG_HOME='/home/ludo'
-            ORIG_LOGNAME='ludo'
-            ORIG_USER='ludo'
-            PATH='/bin:/usr/bin'
-            PPID='18793'
-            PS1='# '
-            PS2='> '
-            PS4='+ '
-            PWD='/home/ludo/Documents/work/dev/dlang/fmount'
-            SUPERCMD='set'
-            TERM='xterm-256color'
-            USER='root'
-       +/
+    return _realUserAndGroup;
+}
 
-    return getSomeUserAndGroup("ruser,rgroup");
+/**
+ * Retrieve the HOME directory of the current real user of the running process.
+ *
+ * Please note that calling `fmount` from `super` lets the process retrieve a
+ * custom `HOME` while `sudo` does not provide such informations and thus only
+ * the value from `/etc/passwd` can be retrieved.
+ *
+ * Params:
+ *   realUser = The login of the real user running the process.
+ *
+ * Returns:
+ *   An absolute path to a home directory.
+ */
+string getRealUserHome(string realUser)
+{
+    import std.process : env = environment;
+
+    //home transmitted by `super`
+    string home = env.get("CALLER_HOME", "");
+
+    if (home.length == 0)
+    {
+        if (env.get("SUDO_USER", "").length > 0)
+        {
+            //home not transmitted by `sudo`
+            string passwdLine = getUserEtcPasswdLine(realUser);
+            home = passwdLine.split(":")[5];
+        }
+        else
+            home = env.get("HOME");
+    }
+
+    return home;
+}
+
+private string getUserEtcPasswdLine(string user)
+{
+    enum PasswdPath = "/etc/passwd";
+
+    File passwd = File(PasswdPath);
+    string line;
+
+    while ((line = passwd.readln()) !is null)
+    {
+        if (line[0 .. user.length] == user
+            && line[user.length] == ':')
+        {
+            return line;
+        }
+    }
+
+    throw new Exception(_f!"User '%s' not found in %s"(user, PasswdPath));
 }
 
 unittest
@@ -242,21 +252,7 @@ unittest
     import std.string : join;
 
     string expectedUser = env.get("USER", "user");
-    string passwdLine =
-    {
-        File passwd = File("/etc/passwd");
-        string line;
-        while ((line = passwd.readln()) !is null)
-        {
-            if (line[0 .. expectedUser.length] == expectedUser
-                && line[expectedUser.length] == ':')
-            {
-                return line;
-            }
-        }
-
-        return line;
-    }();
+    string passwdLine = getUserEtcPasswdLine(expectedUser);
 
     // expectedUserGroup is usually 1000:1000 for a single user environment.
     string expectedUserGroup = passwdLine.split(":")[2..4].join(":");
@@ -276,7 +272,20 @@ unittest
  */
 void chown(string user, string path)
 {
-    runCommand(format("chown %s '%s'", user, path));
+    runCommand(_f!"chown %s '%s'"(user, path));
+}
+
+/**
+ * Check whether a file or directory is owned by the specified user.
+ *
+ * Params:
+ *   path = A path to a file or directory.
+ *   user = The login of the expected owner.
+ */
+bool isOwnedBy(string path, string user)
+{
+    import std.algorithm.comparison : equal;
+    return equal(runCommand(_f!"stat -c %%U '%s'"(path)), user);
 }
 
 
@@ -412,7 +421,7 @@ class CommandFailedException : Exception
                 code = -status;
             }
 
-            return format(msg, output, command, code);
+            return _f(msg, output, command, code);
         }
 
         static string buildMessage(string command, Throwable reason)
@@ -420,7 +429,7 @@ class CommandFailedException : Exception
             string msg;
             string sReason;
 
-            if (reason !is null)
+            if(reason)
             {
                 msg = "Command '%s' failed : %s";
                 sReason = text(reason.message());
@@ -431,7 +440,7 @@ class CommandFailedException : Exception
                 sReason = "";
             }
 
-            return format(msg, command, sReason);
+            return _f(msg, command, sReason);
         }
 }
 
@@ -517,7 +526,18 @@ void closeAndRemove(File tobeRemoved)
 void removeIfExists(string path)
 {
     if (exists(path))
-        remove(path);
+    {
+        if (isDir(path))
+        {
+            trace(_f!"Removing directory %s"(path));
+            rmdirRecurse(path);
+        }
+        else
+        {
+            trace(_f!"Removing file %s"(path));
+            remove(path);
+        }
+    }
 }
 
 

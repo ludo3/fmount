@@ -23,7 +23,7 @@ module mnt.umount;
 
 import std.path : baseName;
 
-import argsutil : exec_dirs;
+import appargs : exec_dirs;
 import constvals : VbLevel;
 import dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev, is_encrypted;
 import luks : luksClose;

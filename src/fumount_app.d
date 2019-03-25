@@ -19,13 +19,13 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import argsutil :
-    ArgumentException,
+import appargs :
     exec_dir_help, exec_dirs,
     execDirHandler,
     fake, fake_help,
     quiet_help,
     verbose, verbose_help, verboseHandler;
+import argsutil : ArgumentException;
 import dutil : named;
 import mnt.umount : fumount;
 import run;
@@ -37,6 +37,15 @@ import ui : error, traceStack;
  *     args    = The program arguments.
  */
 void main(string[] args)
+{
+    version(unittest)
+        stderr.writefln!"%s(%d) unittest : %s is disabled."
+                        (__FILE__, __LINE__, __FUNCTION__);
+    else
+        doMain(args);
+}
+
+private void doMain(string[] args)
 {
     try
     {
@@ -66,7 +75,9 @@ void main(string[] args)
                 throw ArgumentException.badNb(1, 1, args.length);
 
             run_parsed(&fumount, progName, args,
-                       named("exec_dirs", exec_dirs));
+                       named("exec_dirs", exec_dirs),
+                       named("verbose", verbose),
+                       named("fake", fake));
         }
     }
     catch(ArgumentException ae)
@@ -80,4 +91,3 @@ void main(string[] args)
         error(goe.msg);
     }
 }
-

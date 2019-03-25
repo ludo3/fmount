@@ -19,19 +19,26 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import argsutil :
-    ArgumentException,
+import appargs :
     exec_dir_help, exec_dirs,
     execDirHandler,
     fake, fake_help,
-    option_help, options, optionHandler,
     quiet_help,
-    verbose, verbose_help, verboseHandler;
+    verbose, verbose_help, verboseHandler,
+    version_help, version_requested;
+import argsutil : ArgumentException;
 import dutil : named;
 import mnt.mount : fmount;
 import mountargs :
+    atime_help, atimeHandler,
+    exec_help, execHandler, noexec_help,
+    option_help, options, optionHandler,
     passphrase_file, passphrase_help,
-    norandom_help, randfileHandler, random_file, random_help, urandom_help;
+    norandom_help, randfileHandler, random_file, random_help, urandom_help,
+    read_only_help, read_write_help, readWriteHandler,
+    sync_help, async_help, syncHandler,
+    type_help, typeHandler,
+    umask_help, umaskHandler;
 import run : run_parsed;
 import ui : error, traceStack;
 
@@ -42,24 +49,44 @@ import ui : error, traceStack;
  */
 void main(string[] args)
 {
+    version(unittest)
+        stderr.writefln!"%s(%d) unittest : %s is disabled."
+                        (__FILE__, __LINE__, __FUNCTION__);
+    else
+        doMain(args);
+}
+
+void doMain(string[] args)
+{
     try
     {
         auto parsed_args = getopt(
             args,
             std.getopt.config.bundling,
 
-            "passfile|p",   passphrase_help, &passphrase_file,
+            "passphrase|p",   passphrase_help, &passphrase_file,
 
-            "use-norandom", norandom_help, &randfileHandler,
-            "use-random",   random_help,   &randfileHandler,
-            "use-urandom",  urandom_help,  &randfileHandler,
+            //"use-norandom", norandom_help, &randfileHandler,
+            //"use-random",   random_help,   &randfileHandler,
+            //"use-urandom",  urandom_help,  &randfileHandler,
 
             "exec-dir|D",  exec_dir_help,  &execDirHandler,
+            "read-only|r", read_only_help, &readWriteHandler,
+            "read-write|w", read_write_help, &readWriteHandler,
+            "atime|A", atime_help, &atimeHandler,
+            "exec|e", exec_help, &execHandler,
+            "noexec|E", noexec_help, &execHandler,
+            "type|t", type_help, &typeHandler,
+            "charset|c", type_help, &typeHandler,
+            "umask|u", umask_help, &umaskHandler,
+            "sync|s", sync_help, &syncHandler,
+            "async|S", async_help, &syncHandler,
             "option|o",  option_help,  &optionHandler,
 
             "quiet|q",   quiet_help, &verboseHandler,
             "verbose|v", verbose_help, &verboseHandler,
-            "fake|F",    fake_help, &fake);
+            "fake|F",    fake_help, &fake,
+            "version|V", version_help, &version_requested);
 
         if (parsed_args.helpWanted)
         {
@@ -68,6 +95,7 @@ void main(string[] args)
                                    ~"authorized by the system administrator.",
                                    parsed_args.options);
         }
+        // TODO handle version_requested
         else {
             string progName = args[0];
             args = args[1..$];
@@ -79,7 +107,9 @@ void main(string[] args)
                        named("passphrase", passphrase_file),
                        named("random_file", random_file),
                        named("exec_dirs", exec_dirs),
-                       named("options", options));
+                       named("options", options),
+                       named("verbose", verbose),
+                       named("fake", fake));
         }
     }
     catch(ArgumentException ae)
@@ -93,4 +123,5 @@ void main(string[] args)
         error(goe.msg);
     }
 }
+
 

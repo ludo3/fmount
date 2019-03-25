@@ -40,11 +40,30 @@ enum VbLevel
 }
 
 
-/// The name of the configuration directory.
-static enum confdir_name = ".fmount";
+/// The default directory under which mountpoints are created.
+enum string DfltMountRoot = "/media";
 
-/// The name of the configuration file.
-static enum conffile_name = "fmountrc";
+struct ConfFile
+{
+    import std.path : sep = dirSeparator;
+
+    string root;
+
+    string dirs;
+
+    string name;
+
+    string toString()
+    {
+        return root ~ sep ~ dirs ~ sep ~ name;
+    }
+}
+
+/// The system configuration root, directory and file name.
+enum ConfFile SysCfg = { "/etc", "fmount", "fmount.conf" };
+
+/// The user configuration root, directory and file name.
+enum ConfFile UsrCfg = { "~", ".fmount", "fmountrc" };
 
 
 /// The disk-like device categories.
@@ -139,6 +158,9 @@ static immutable ushort ModePrivateRW = octal!600;
 
 /// The mode for user-only read-write directories.
 static immutable ushort ModePrivateRWX = octal!700;
+
+/// The mode for user-only write directories.
+static immutable ushort ModePrivateWX = octal!300;
 
 /// The maximum label length for each supported filesystem.
 immutable long[string] MAX_FS_LABEL_LENGTHS;

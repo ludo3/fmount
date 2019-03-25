@@ -22,9 +22,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module argsutil;
 
 import std.algorithm.iteration : filter;
-import std.array : array, join;
-import std.conv : text;
-import std.file : getSize;
+import std.array : array;
 import std.format : format;
 import std.getopt : Option;
 import std.range.primitives : isOutputRange;
@@ -38,164 +36,17 @@ import ui : tracef;
 
 
 /**
- * Get the --key-file and --keyfile-size arguments for cryptsetup.
- *
- * Params:
- *     password_file = the path to a file containing the password.
- *
- * Returns: a string array with `--key-file` and `--keyfile-size` options
- *          for `cryptsetup luksOpen`.
- */
-string[] luks_keyfile_args(const string password_file)
-{
-    if (password_file is null || password_file.length == 0)
-        return [];
-
-    auto pass_size = getSize(password_file);
-
-    const string pass_name = password_file;
-    auto pass_args = [ "--key-file",     pass_name,
-                       "--keyfile-size", text(pass_size) ];
-
-    return pass_args;
-}
-
-
-private immutable static VbLevel dflt_verbose = VbLevel.Warn;
-
-/// Tell what is done.
-VbLevel verbose = dflt_verbose;
-
-static this()
-{
-    version(unittest)
-    verbose = VbLevel.Info;
-}
-
-/**
- * verboseHandler handles `--quiet` and `--verbose` options.
- * Params:
- *     option =    an option without argument: one of
- *                 `-q`, `--quiet`, `-v`, `--verbose`.
- */
-void verboseHandler(string option)
-{
-    switch (option)
-    {
-      case "quiet|q": verbose = VbLevel.None; break;
-      case "verbose|v": verbose += 1; break;
-      default :
-        stderr.writeln("Unknown verbosity level ", option);
-        break;
-    }
-}
-
-/// help for quiet option
-auto quiet_help = "Be quiet : disable verbosity.";
-
-private immutable static string verbose_fmt =
-    "Print what is done. This can be used several times. Default: %s.";
-
-/// help for verbose option
-auto verbose_help = format!verbose_fmt(dflt_verbose);
-
-
-/// Disable the execution of the generated command.
-bool fake = false;
-
-/// Help for the fake|F option.
-immutable static string fake_help = "Disable any modification command.";
-
-
-/**
  * Print the parsed options and arguments.
  * Params:
- *     Opts    = The types of the program-specific options.
+ *     Opts    = The types of the program options.
  *     prog    = The program name.
  *     args    = The remaining positional arguments.
- *     customOptions = The program-specific options.
+ *     options = The program options.
  */
-void print_args(Opts...)(string prog, string[] args, Opts customOptions)
+void print_args(Opts...)(string prog, string[] args, Opts options)
 {
     import std.stdio : stderr;
-    output_args!(tracef, stderr, Opts)(prog, args, customOptions);
-}
-
-
-private immutable static auto _usual_exec_dirs = [
-        "/usr/local/sbin",
-        "/usr/local/bin",
-        "/usr/sbin",
-        "/usr/bin",
-        "/sbin",
-        "/bin",
-        ];
-
-/// The `--exec-dir` description.
-auto exec_dir_help = join([
-    "Use the specified execution directory. The option must be used for each",
-    "directory to be used. The default execution directories are:\n",
-    format!"               %s."(join(_usual_exec_dirs, "\n                ")),
-    ], " ");
-
-/**
- * The usual execution directories which may be overriden before parsing
- * program options.
- */
-auto dflt_exec_dirs = _usual_exec_dirs;
-
-/// The execution directories.
-string[] exec_dirs = [];
-
-/**
- * execDirHandler handles the `-D` / `--exec-dir` option.
- *
- * The `exec_dirs` public value is updated.
- *
- * Params:
- *     option =    the option short or long name: one of
- *                 `-D`, `--exec-dir`.
- *     value  =    the option value.
- */
-void execDirHandler(string option, string value)
-{
-    exec_dirs ~= [ value ];
-}
-
-/**
- * Ensure that execution directories are set.
- */
-void check_exec_dirs() {
-    if (exec_dirs.length != 0)
-        return;
-
-    // A manual copy is needed because of the type difference.
-    exec_dirs = new string[ dflt_exec_dirs.length ];
-    for (auto i = 0; i < dflt_exec_dirs.length; i++) {
-        exec_dirs[i] = dflt_exec_dirs[i];
-    }
-}
-
-
-/// The mount options.
-string[] options = [];
-
-/// The option help message.
-immutable static string option_help = "Enable an option";
-
-/**
- * optionHandler handles the `-o` / `--option` option.
- *
- * The `options` public value is updated.
- *
- * Params:
- *     program_option =    the option short or long name: one of
- *                 `-o`, `--option`.
- *     value  =    the option value.
- */
-void optionHandler(string program_option, string value)
-{
-    options ~= [ value ];
+    output_args!(tracef, stderr, Opts)(prog, args, options);
 }
 
 
@@ -204,22 +55,22 @@ void optionHandler(string program_option, string value)
  *
  * Each `Opt` type is expected to be a `named` template instance.
  * Params:
- *     Opts   = The types of the program-specific options.
+ *     Opts   = The types of the program options.
  *     uifun  = One of the ui `infof`, `tracef`, ... functions.
  *     output = An output range used to write the options and arguments.
  *     prog   = The program name.
  *     args   = The positional arguments.
- *     customOptions = The program-specific options.
+ *     options = The program options.
  */
 void output_args(alias uifun, alias output, Opts...)(string prog, string[] args,
-                          Opts customOptions)
+                          Opts options)
 if (is(typeof(output) == typeof(stderr)))
 in
 {
-    static foreach(customOpt; customOptions)
+    static foreach(option; options)
     {
-        static assert(__traits(compiles, customOpt.name));
-        static assert(__traits(compiles, customOpt.value));
+        static assert(__traits(compiles, option.name));
+        static assert(__traits(compiles, option.value));
     }
 }
 do
@@ -228,11 +79,8 @@ do
 
     uifun("%s Options:", output, prog);
 
-    foreach(customOpt; customOptions)
-        uifun(fmt, output, customOpt.name, customOpt.value);
-
-    uifun(fmt, output, "verbose", verbose);
-    uifun(fmt, output, "fake", fake);
+    foreach(option; options)
+        uifun(fmt, output, option.name, option.value);
 
     auto positionalArgs = args
         .filter!(a => a.length == 0 || a[0] != '-')()
