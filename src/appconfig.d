@@ -69,7 +69,7 @@ private string getCfgDir(string unittestDirName, alias ConfFile cf)()
         root = join_paths(deleteme, unittestDirName);
     }
     else
-        root = releaseRoot;
+        root = cf.root;
 
     return get_dir(join_paths(root, cf.dirs), ModePrivateWX);
 }
