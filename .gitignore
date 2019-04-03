@@ -8,6 +8,7 @@ TODO*
 *.exe
 *.o
 *.obj
+*.old
 *.lst
 .*.swo
 .*.swp
