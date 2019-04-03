@@ -24,7 +24,7 @@ import std.stdio : writeln;
 import appargs : check_exec_dirs, verbose;
 import argsutil : print_args;
 import constvals : VbLevel;
-import dutil : printThChain;
+import dutil.exceptions : printThChain;
 import ui : info_;
 
 //TODO replace std.getopt with argsd library

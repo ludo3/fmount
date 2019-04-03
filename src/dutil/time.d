@@ -20,7 +20,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module dateutil;
+module dutil.time;
 
 import core.time : Duration, seconds;
 
@@ -314,7 +314,7 @@ public:
     {
         import std.algorithm.comparison : cmp;
         import std.format : _f=format;
-        import dutil : srcln;
+        import dutil.src : srcln;
 
         immutable string fmt = format;
         int result;
@@ -375,7 +375,7 @@ public:
                     else if (precision >= OneMicros)
                         tpl = microsTpl;
 
-                    import dutil : dbg;
+                    import dutil.src : dbg;
                     dbg.ln("Using dateTime template '%s' (%d characters).",
                            tpl, tpl.length);
                     return tpl.length;
@@ -403,7 +403,7 @@ public:
                 }
             }
 
-            import dutil : dbg;
+            import dutil.src : dbg;
             dbg.ln("Comparing %d characters (%s format) and %s => %s and %s",
                    length, format,
                    thisFormatted, formatted,
@@ -570,6 +570,15 @@ if (isTimeType!TimeType)
 
     immutable roundedStDur = nsecs(roundedNanos);
     return st0 + roundedStDur;
+}
+
+
+/// Sleeps the current thread the specified number of duration units.
+void sleep(T, alias unit="msecs")(T nbUnits)
+if (isScalarType!(T) && isSomeString!(typeof(unit)))
+{
+    import core.thread : dur, Thread;
+    Thread.sleep( dur!unit(nbUnits) );
 }
 
 

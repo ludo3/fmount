@@ -33,7 +33,7 @@ import config;
 import constvals :
     ConfFile, SysCfg, UsrCfg,
     DfltMountRoot, ModePrivateWX, VbLevel;
-import dutil : printThChain;
+import dutil.exceptions : printThChain;
 import osutil :
     get_dir, getRealUserAndGroup, getRealUserHome,
     isOwnedBy, jn, join_paths;
@@ -201,7 +201,7 @@ private string getRoot(Config userConfig, Config sysConfig,
     string user = usrGrp[0];
     string absRoot = checkDir(replVars(root));
 
-    import dutil : srcln;
+    import dutil.src : srcln;
     foreach(allowedRoot; allowedRoots)
     {
 
@@ -262,7 +262,7 @@ unittest
     import std.exception : assertThrown, collectExceptionMsg, enforce;
     import std.file : deleteme, rmdirRecurse, write;
     import std.format : _f = format;
-    import dutil : srcln, unused;
+    import dutil.src : srcln, unused;
     import osutil : removeIfExists;
 
     string tmpHome = get_dir(deleteme ~ "/testHome");

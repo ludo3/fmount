@@ -26,7 +26,7 @@ import appargs :
     quiet_help,
     verbose, verbose_help, verboseHandler;
 import argsutil : ArgumentException;
-import dutil : named;
+import dutil.typecons : named;
 import mnt.umount : fumount;
 import run;
 import ui : error, traceStack;

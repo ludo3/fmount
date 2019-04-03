@@ -27,7 +27,7 @@ import appargs :
     verbose, verbose_help, verboseHandler,
     version_help, version_requested;
 import argsutil : ArgumentException;
-import dutil : named;
+import dutil.typecons : named;
 import mnt.mount : fmount;
 import mountargs :
     atime_help, atimeHandler,

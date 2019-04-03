@@ -33,7 +33,7 @@ import appconfig;
 import appargs : fake, verbose;
 import constvals : how_to_run_as_root, VbLevel;
 import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
-import dutil : printThChain;
+import dutil.exceptions : printThChain;
 import osutil : assertDirExists, jn;
 import ui : dbug, dbugf, error, errorf, info_, trace, tracef, warn,
             WithPrefix;
@@ -383,9 +383,9 @@ unittest
     import std.regex : matchFirst;
     import appargs : verbose;
     import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT, VbLevel;
-    import dutil : srcln, unused;
+    import dutil.file : MaybeTempFile;
+    import dutil.src : srcln, unused;
     import osutil : removeIfExists;
-    import tempfile : NamedTemporaryFile;
     import ui : dbug;
 
     //verbose = VbLevel.Dbug;
@@ -464,9 +464,7 @@ unittest
     }
     do
     {
-        auto tempfstab = new NamedTemporaryFile("fstab", ".tmp");
-        scope(exit)
-            removeIfExists(tempfstab.name);
+        auto tempfstab = MaybeTempFile("fstab", ".tmp");
         tempfstab.writeln(fstabContent);
         tempfstab.flush();
 

@@ -322,7 +322,7 @@ unittest
     import std.file : deleteme;
     import std.format : format;
 
-    import dutil : SrcLn, srcln;
+    import dutil.src : SrcLn, srcln;
 
     immutable int MISSING_INT = -9876;
     immutable string MISSING_STRING = "MISSING STRING IN CONFIG";

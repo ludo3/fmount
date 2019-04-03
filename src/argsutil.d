@@ -31,7 +31,7 @@ import std.traits : isInstanceOf;
 
 
 public import constvals : VbLevel;
-import dutil: named;
+import dutil.typecons : named;
 import ui : tracef;
 
 

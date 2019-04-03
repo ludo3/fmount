@@ -31,9 +31,8 @@ import unistd = core.sys.linux.unistd;
 import appargs : verbose;
 import constvals : VbLevel, With;
 import dev : dev_descr, dev_display, is_encrypted;
-import dutil : unused;
+import dutil.src : unused;
 import mountargs : passphrase_file;
-import tempfile : NamedTemporaryFile;
 
 version(unittest)
 {
@@ -109,25 +108,27 @@ class PasswordException : Exception
 auto read_password(string dev,
                    bool confirm_for_encryption=false)
 {
-    import file : File;
+    import dutil.file : MaybeTempFile;
+    import std.stdio : File;
 
     string descr = dev_descr(dev, dev_display(dev));
 
     if (confirm_for_encryption || is_encrypted(dev))
     {
         if (passphrase_file)
-            return new File(passphrase_file, "r");
+            return MaybeTempFile(File(passphrase_file, "r"));
         else
         {
-            auto pwf = new NamedTemporaryFile("fmount", "", "w+b");
+            auto pwf = MaybeTempFile("fmount", "", "w+b");
 
-                pwf.write(getpass(descr, confirm_for_encryption));
-                pwf.flush();
-                return pwf;
+            pwf.write(getpass(descr, confirm_for_encryption));
+            pwf.flush();
+
+            return pwf;
         }
     }
     else
-        return null;
+        return MaybeTempFile.init;
 }
 
 
@@ -203,6 +204,141 @@ if (isInputRange!Strings &&
 {
     if (verbose >= minVbLevel)
         warn(messages.join("\n"));
+}
+
+
+version(unittest)
+    debug=1;
+
+debug
+{
+    import std.stdio : stderr;
+    import dutil.src : srcln;
+
+    /// Build and remember the "@file(line):" debug prefix.
+    struct Dbg
+    {
+        public:
+            /// `true` when run from unit tests.
+            enum bool enabled = true;
+
+            /// Constructor with the caller's file and line.
+            this(string file_, size_t line_) @safe pure
+            {
+                _file = file_.idup;
+                _line = line_;
+                _prefix = srcln(file_, line_);
+            }
+
+            /// Copy constructor.
+            this(const ref Dbg other) @safe pure
+            {
+                _file = other._file;
+                _line = other._line;
+            }
+
+            /// Retrieve the caller's file.
+            @property string file() const @safe pure { return _file.idup; }
+
+            /// Retrieve the caller's line.
+            @property size_t line() const @safe pure { return _line; }
+
+            /// Retrieve the debug message prefix, with caller's file and line.
+            @property string prefix() const @safe pure { return _prefix.idup; }
+
+            /// Write a formatted debug information on the standard error file.
+            ref Dbg ln(alias fmt, Args...)(lazy Args args) @trusted
+            if (isSomeString!(typeof(fmt)))
+            {
+                return ln(fmt, args);
+            }
+
+            /// Write a formatted debug information on the standard error file.
+            ref Dbg ln(S, Args...)(lazy S fmt, lazy Args args) @trusted
+            if (isSomeString!(typeof(fmt)))
+            {
+                stderr.write(_prefix);
+                static if (args.length == 0)
+                    stderr.writeln(fmt);
+                else
+                    stderr.writefln(fmt, args);
+
+                return this;
+            }
+
+        private:
+            string _file;
+            size_t _line;
+            string _prefix;
+    }
+
+}
+else
+{
+    import std.traits : isSomeString;
+
+    /// Build and remember the "@file(line):" debug prefix.
+    struct Dbg
+    {
+        /// `true` when run from unit tests.
+        enum bool enabled = false;
+
+        /// Constructor with the caller's file and line.
+        this(string file_, size_t line_) @safe pure
+        {
+        }
+
+        public:
+            /// Copy constructor.
+            this(const ref Dbg other) @safe pure
+            {
+            }
+
+            /// Retrieve the caller's file.
+            @property string file() const @safe pure { return ""; }
+
+            /// Retrieve the caller's line.
+            @property size_t line() const @safe pure { return size_t.init; }
+
+            /// Retrieve the debug message prefix, with caller's file and line.
+            @property string prefix() const @safe pure { return ""; }
+
+            /// Write a formatted debug information on the standard error file.
+            ref Dbg ln(alias fmt, Args...)(lazy Args args) @trusted
+            if (isSomeString!(typeof(fmt)))
+            {
+                return ln(args);
+            }
+
+            /// Write a debug information on the standard error file.
+            ref Dbg ln(S, Args...)(lazy S fmt, lazy Args args) @trusted
+            if (isSomeString!(typeof(fmt)))
+            {
+                unused(fmt);
+                unused(args);
+                return this;
+            }
+    }
+
+}
+
+/// Construct a Dbg formatter with caller's file and line.
+Dbg dbg(string file_=__FILE__, size_t line_=__LINE__) @safe pure
+{
+    return Dbg(file_, line_);
+}
+
+/// Copy a Dbg formatter.
+Dbg dbg(ref const Dbg other) @safe pure
+{
+    return Dbg(other);
+}
+
+/// dbg tests.
+unittest
+{
+    dbg.ln("dbg.ln");
+    dbg.ln("dbg.ln %%d => %d", 1);
 }
 
 
@@ -797,8 +933,9 @@ version(unittest)
 unittest
 {
     import std.stdio : File;
-    import dutil : bkv, unused;
-    import fileutil : getText;
+    import dutil.src : unused;
+    import dutil.trx : bkv;
+    import dutil.file : getText;
     import osutil : removeIfExists;
 
     auto stderr0 = bkv(stderr);
@@ -864,8 +1001,9 @@ unittest
 unittest
 {
     import std.stdio : File;
-    import dutil : bkv, unused;
-    import fileutil : getText;
+    import dutil.src : unused;
+    import dutil.trx : bkv;
+    import dutil.file : getText;
     import osutil : removeIfExists;
 
     auto stderr0 = bkv(stderr);
@@ -931,7 +1069,7 @@ unittest
 unittest
 {
     import std.stdio : File;
-    import fileutil : getText;
+    import dutil.file : getText;
     import osutil : removeIfExists;
 
     File f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
@@ -987,8 +1125,9 @@ unittest
 unittest
 {
     import std.stdio : File;
-    import dutil : bkv, unused;
-    import fileutil : getText;
+    import dutil.src : unused;
+    import dutil.trx : bkv;
+    import dutil.file : getText;
     import osutil : removeIfExists;
 
     auto f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");

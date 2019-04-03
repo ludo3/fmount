@@ -73,7 +73,7 @@ if (isSomeString!S &&
     (is(F == typeof(null)) || hasMember!(F, "name")))
 {
     string password_file_name;
-    if (password_file)
+    if (password_file != typeof(password_file).init)
         password_file_name = password_file.name;
 
     immutable auto openCmdArr = cast(immutable(string[]))

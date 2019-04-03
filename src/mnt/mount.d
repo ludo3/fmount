@@ -33,7 +33,6 @@ import appargs : exec_dirs, fake, verbose;
 import constvals : VbLevel;
 import dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
              is_encrypted;
-import dutil : printThChain;
 import luks : luksOpen, luksClose;
 import mnt.common : check_user, ensure_mntdir_exists, find_mountpoint,
                     get_expected_mountpoint, get_fstab_mountpoint,
@@ -312,7 +311,8 @@ version(unittest)
     import std.format : _f = format;
     import std.stdio : stderr;
     import std.typecons : tuple;
-    import dutil : immbkv, srcln;
+    import dutil.src : srcln;
+    import dutil.trx : immbkv;
 
     private auto bkupOptions()
     {
@@ -391,7 +391,7 @@ unittest
     import std.format : _f = format;
     import std.traits : isSomeString;
 
-    import dutil : unused;
+    import dutil.src : unused;
 
     immutable opts0 = bkupOptions();
     unused(opts0);
@@ -433,7 +433,7 @@ unittest
 {
     import std.algorithm.comparison : equal;
     import constvals : VbLevel;
-    import dutil : unused;
+    import dutil.src : unused;
     import mountargs : dflt_atimes, ForceReadWrite;
 
     immutable opts0 = bkupOptions();

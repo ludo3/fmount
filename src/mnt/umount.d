@@ -21,7 +21,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module mnt.umount;
 
-import std.path : baseName;
+import std.path : bn = baseName;
 
 import appargs : exec_dirs;
 import constvals : VbLevel;
@@ -31,8 +31,6 @@ import mnt.common : check_user, find_mountpoint, is_in_fstab,
                     remove_automatically_created_dir;
 import osutil : get_exec_path, runCommand;
 import ui : dbugf, info_, infof, show_warnings, traceStack;
-
-private alias bn = baseName;
 
 /**
  * Main fumount function.
