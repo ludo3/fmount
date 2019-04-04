@@ -26,7 +26,7 @@ import std.process : environment, execute, executeShell, ProcessException,
                      thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
 import std.regex : Regex, regex, split;
-import std.stdio : File, stderr, writefln, writeln;
+import std.stdio : File;
 import std.string : indexOf, join, split, strip, tr;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
@@ -326,7 +326,7 @@ string runCommand(string[] command)
 {
     if (verbose >= VbLevel.Info)
     {
-        writeln(command.join(" "));
+        info_(command.join(" "));
     }
     if (!fake)
     {

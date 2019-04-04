@@ -23,7 +23,7 @@ import std.conv : text;
 import std.exception : basicExceptionCtors;
 import std.format : format, formattedWrite;
 import std.range.primitives : ElementType, isInputRange, isOutputRange;
-import std.stdio : stderr, stdout, writeln;
+import std.stdio : stderr, stdout;
 import std.string : fromStringz, toStringz;
 import std.traits : isSomeChar, isSomeString;
 import unistd = core.sys.linux.unistd;
@@ -212,7 +212,6 @@ version(unittest)
 
 debug
 {
-    import std.stdio : stderr;
     import dutil.src : srcln;
 
     /// Build and remember the "@file(line):" debug prefix.

@@ -22,8 +22,8 @@ import std.stdio : writefln;
 import std.string : indexOf;
 
 import appargs : verbose;
-import constvals : VbLevel;
 import sdlang : parseFile, parseSource, SDLangException, Tag, Value;
+import ui : tracef, warnf;
 
 
 /**
@@ -257,15 +257,9 @@ class Config
                 if (exists(parent))
                 {
                     if (isDir(parent))
-                    {
-                        if (verbose >= VbLevel.More)
-                            writefln("No config file '%s'", src);
-                    }
+                        tracef("No config file '%s'", src);
                     else
-                    {
-                        if (verbose >= VbLevel.Warn)
-                            writefln("'%s' should be a directory.", parent);
-                    }
+                        warnf("'%s' should be a directory.", parent);
                 }
             }
         }

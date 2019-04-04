@@ -25,7 +25,6 @@ import std.file : dirEntries, exists, FileException, isDir, mkdir, readText,
 import std.path : bn=baseName, dn=dirName, isAbsolute;
 import std.process : ProcessException;
 import std.regex : matchFirst, regex;
-import std.stdio : stderr;
 import std.string : format;
 import std.traits : isSomeString;
 

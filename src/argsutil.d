@@ -29,8 +29,6 @@ import std.range.primitives : isOutputRange;
 import std.stdio : stderr;
 import std.traits : isInstanceOf;
 
-
-public import constvals : VbLevel;
 import dutil.typecons : named;
 import ui : tracef;
 

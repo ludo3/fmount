@@ -25,7 +25,7 @@ import appargs : check_exec_dirs, verbose;
 import argsutil : print_args;
 import constvals : VbLevel;
 import dutil.exceptions : printThChain;
-import ui : info_;
+import ui : info_, error;
 
 //TODO replace std.getopt with argsd library
 /**
@@ -39,7 +39,7 @@ GetoptResult check_opts(T...)(ref string[] args, T opts)
     }
     catch(GetOptException goe)
     {
-        writeln(goe.msg);
+        error(goe.msg);
         throw goe;
     }
 }
