@@ -439,7 +439,7 @@ unittest
     import std.algorithm.comparison : equal;
     import dutil.constvals : VbLevel;
     import dutil.src : unused;
-    import mountargs : dflt_atimes, ForceReadWrite;
+    import fmount.mnt.mountargs : dflt_atimes, ForceReadWrite;
 
     immutable opts0 = bkupOptions();
     unused(opts0);
