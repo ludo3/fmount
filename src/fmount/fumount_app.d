@@ -24,10 +24,12 @@ import dutil.appargs :
     execDirHandler,
     fake, fake_help,
     quiet_help,
-    verbose, verbose_help, verboseHandler;
+    verbose, verbose_help, verboseHandler,
+    version_help, version_requested, versionHandler;
 import dutil.run : run_parsed;
 import dutil.typecons : named;
 import fmount.argsutil : ArgumentException;
+import fmount.appver : ver;
 import fmount.mnt.umount : fumount;
 import dutil.ui : error, traceStack;
 
@@ -58,7 +60,8 @@ private void doMain(string[] args)
 
             "quiet|q",   quiet_help, &verboseHandler,
             "verbose|v", verbose_help, &verboseHandler,
-            "fake|F",    fake_help, &fake);
+            "fake|F",    fake_help, &fake,
+            "version|V", version_help, &versionHandler);
 
         if (parsed_args.helpWanted)
         {
@@ -72,10 +75,10 @@ private void doMain(string[] args)
             string progName = args[0];
             args = args[1..$];
 
-            if (args.length != 1)
+            if (!version_requested && args.length != 1)
                 throw ArgumentException.badNb(1, 1, args.length);
 
-            run_parsed(&fumount, progName, args,
+            run_parsed(ver, &fumount, progName, args,
                        named("exec_dirs", exec_dirs),
                        named("verbose", verbose),
                        named("fake", fake));

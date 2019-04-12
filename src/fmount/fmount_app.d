@@ -26,9 +26,10 @@ import dutil.appargs :
     fake, fake_help,
     quiet_help,
     verbose, verbose_help, verboseHandler,
-    version_help, version_requested;
+    version_help, version_requested, versionHandler;
 import dutil.run : run_parsed;
 import dutil.typecons : named;
+import fmount.appver : ver;
 import fmount.argsutil : ArgumentException;
 import fmount.mnt.mount : fmount;
 import fmount.mnt.mountargs :
@@ -86,7 +87,7 @@ void doMain(string[] args)
             "quiet|q",   quiet_help, &verboseHandler,
             "verbose|v", verbose_help, &verboseHandler,
             "fake|F",    fake_help, &fake,
-            "version|V", version_help, &version_requested);
+            "version|V", version_help, &versionHandler);
 
         if (parsed_args.helpWanted)
         {
@@ -95,15 +96,15 @@ void doMain(string[] args)
                                    ~"authorized by the system administrator.",
                                    parsed_args.options);
         }
-        // TODO handle version_requested
-        else {
+        else
+        {
             string progName = args[0];
             args = args[1..$];
 
-            if (args.length < 1 || args.length > 2)
+            if (!version_requested &&(args.length < 1 || args.length > 2))
                 throw ArgumentException.badNb(1, 2, args.length);
 
-            run_parsed(&fmount, progName, args,
+            run_parsed(ver, &fmount, progName, args,
                        named("passphrase", passphrase_file),
                        named("exec_dirs", exec_dirs),
                        named("options", options),

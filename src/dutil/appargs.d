@@ -133,6 +133,19 @@ bool version_requested;
 /// Help for rhe version|V option.
 string version_help = "Print the current version number.";
 
-// TODO version number (major, minor, revision, preversion) and string.
-
+/**
+ * Version request.
+ * Params:
+ *     option =    an option without argument: `-V`, `--version`.
+ */
+void versionHandler(string option)
+{
+    switch (option)
+    {
+      case "version|V": version_requested = true; break;
+      default :
+        stderr.writeln("Unknown version request ", option);
+        break;
+    }
+}
 

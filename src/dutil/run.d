@@ -21,10 +21,11 @@ module dutil.run;
 import std.getopt : GetOptException, GetoptResult, getopt;
 import std.stdio : writeln;
 
-import dutil.appargs : check_exec_dirs, verbose;
+import dutil.appargs : check_exec_dirs, verbose, version_requested;
 import dutil.constvals : VbLevel;
 import dutil.exceptions : printThChain;
-import dutil.ui : info_, error, print_args;
+import dutil.ui : info_, infof, error, print_args;
+import dutil.pkgver : Version;
 
 //TODO replace std.getopt with argsd library
 /**
@@ -57,7 +58,8 @@ alias main_fun = void delegate(string[]);
  *     args    = The program arguments.
  *     customOptions = The program-specific options.
  */
-void run_parsed(Opts...)(void function(string, string[]) main,
+void run_parsed(Opts...)(Version ver,
+                         void function(string, string[]) main,
                          string prog, string[] args,
                          Opts customOptions)
 {
@@ -66,15 +68,20 @@ void run_parsed(Opts...)(void function(string, string[]) main,
         if (verbose >= VbLevel.More)
             print_args(prog, args, customOptions);
 
-        try
+        if (version_requested)
+            writeln(prog, ' ', ver);
+        else
         {
-            main(prog, args);
-        }
-        catch(Exception ex)
-        {
-            if (verbose >= VbLevel.Dbug)
-                printThChain(ex);
-            info_(ex.msg);
+            try
+            {
+                main(prog, args);
+            }
+            catch(Exception ex)
+            {
+                if (verbose >= VbLevel.Dbug)
+                    printThChain(ex);
+                info_(ex.msg);
+            }
         }
 }
 
