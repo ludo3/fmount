@@ -14,7 +14,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module mnt.common;
+module fmount.mnt.common;
 
 import core.stdc.errno : ENOENT, ENOTDIR, EPERM;
 import std.algorithm : canFind, map, startsWith;
@@ -28,13 +28,15 @@ import std.regex : matchFirst, regex;
 import std.string : format;
 import std.traits : isSomeString;
 
-import appconfig;
-import appargs : fake, verbose;
-import constvals : how_to_run_as_root, VbLevel;
-import dev : dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
+import devices.dev :
+    dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
+import dutil.appargs : fake, verbose;
+import dutil.constvals : VbLevel;
 import dutil.exceptions : printThChain;
-import osutil : assertDirExists, jn;
-import ui : dbug, dbugf, error, errorf, info_, trace, tracef, warn,
+import fmount.config;
+import fmount.constvals : how_to_run_as_root;
+import dutil.os : assertDirExists, jn;
+import dutil.ui : dbug, dbugf, error, errorf, info_, trace, tracef, warn,
             WithPrefix;
 
 
@@ -291,7 +293,7 @@ S get_fstab_mountpoint(S)(S device)
 if (isSomeString!S)
 {
     import std.functional : toDelegate;
-    import constvals : FSTAB_PATH;
+    import fmount.constvals : FSTAB_PATH;
 
     alias devPath = dev_path!S;
     alias devLinkPaths = dev_link_paths!S;
@@ -315,7 +317,7 @@ if (isSomeString!S && isSomeString!(typeof(fstab_path)))
     import std.range.primitives : ElementType;
     import std.traits: Unqual;
 
-    import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT;
+    import fmount.constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT;
 
     alias Char = Unqual!(ElementType!S);
 
@@ -380,12 +382,11 @@ unittest
 {
     import std.format : _f = format;
     import std.regex : matchFirst;
-    import appargs : verbose;
-    import constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT, VbLevel;
     import dutil.file : MaybeTempFile;
     import dutil.src : srcln, unused;
-    import osutil : removeIfExists;
-    import ui : dbug;
+    import fmount.constvals : FSTAB_ATTR_PATT, FSTAB_DEVPATH_PATT;
+    import dutil.os : removeIfExists;
+    import dutil.ui : dbug;
 
     //verbose = VbLevel.Dbug;
 
@@ -589,7 +590,7 @@ if (isSomeString!S)
     import core.sys.posix.unistd : geteuid;
     import std.process : environment;
 
-    import osutil : getRealUserAndGroup;
+    import dutil.os : getRealUserAndGroup;
 
     auto euid = geteuid();
 

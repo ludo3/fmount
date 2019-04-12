@@ -14,7 +14,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module osutil;
+module dutil.os;
 
 import core.stdc.errno : ENOENT, ENOTDIR;
 import std.conv : parse, text, to;
@@ -31,9 +31,9 @@ import std.string : indexOf, join, split, strip, tr;
 import std.traits : isSomeString, Unqual;
 import std.uni : isWhite;
 
-import appargs : fake, verbose;
-import constvals : ModePrivateRWX, VbLevel;
-import ui : info_, infof, trace, tracef;
+import dutil.appargs : fake;
+import dutil.constvals : ModePrivateRWX, VbLevel;
+import dutil.ui : info_, trace, tracef;
 
 
 /**
@@ -82,19 +82,10 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
 
     if (!exists(expanded_path))
     {
-        if (verbose >= VbLevel.Info)
-        {
-            if (expanded_path != path)
-            {
-                enum string fmt = "Creating directory %s => %s";
-                trace(_f!fmt(path, expanded_path));
-            }
-            else
-            {
-                enum string fmt = "Creating directory %s";
-                trace(_f!fmt(path));
-            }
-        }
+        if (expanded_path != path)
+            trace(_f!"Creating directory %s => %s"(path, expanded_path));
+        else
+            trace(_f!"Creating directory %s"(path));
 
         if (!fake)
         {
@@ -324,10 +315,8 @@ string runCommand(string command)
  */
 string runCommand(string[] command)
 {
-    if (verbose >= VbLevel.Info)
-    {
-        info_(command.join(" "));
-    }
+    info_(command.join(" "));
+
     if (!fake)
     {
         try

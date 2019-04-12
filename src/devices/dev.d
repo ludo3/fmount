@@ -17,7 +17,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module dev;
+module devices.dev;
 
 import std.algorithm : filter, map;
 import std.algorithm.sorting : sort;
@@ -31,9 +31,10 @@ import std.string : endsWith, format, indexOf, join, toLower;
 import std.traits : isSomeString;
 import std.typecons : tuple;
 
-import constvals : DevDir, DevMapperDir, VbLevel;
-import osutil : get_exec_path, jn, readIntFile, runCommand;
-import ui: dbug, dbugf;
+import devices.constvals : DevDir, DevMapperDir;
+import dutil.constvals : VbLevel;
+import dutil.os : get_exec_path, jn, readIntFile, runCommand;
+import dutil.ui: dbug, dbugf;
 
 alias bn = baseName;
 alias dn = dirName;
@@ -543,9 +544,6 @@ bool is_removable(S)(S dev)
 if (isSomeString!S)
 {
     S hwname = dev_name(dev);
-    /+import ui:dbug;
-    dbug("is_partition(dev) is ", is_partition(dev));+/
-    // FIXME debug is_partition, then get_disk_name
     if (is_partition(dev))
         hwname = get_disk_name(dev);
     immutable S removable_path = format!"/sys/class/block/%s/removable"(hwname);
@@ -572,7 +570,7 @@ if (isSomeString!S)
 
     _dbg_is_("is_partition", dev, ret);
 
-    import ui:dbug;dbug("is_partition: return ", ret);
+    import dutil.ui:dbug;dbug("is_partition: return ", ret);
     return ret;
 }
 
@@ -744,6 +742,5 @@ if (isSomeString!S)
 
     return [disk, encrypted_disk];
 }
-
 
 

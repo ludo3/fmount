@@ -40,12 +40,6 @@ mixin template GlobVar(T, int i=-1, string name="gvar%d")
             mixin GlobVar!(T, i, name.replace("%d", ""));
         }
     }
-    /+
-    static if (i >= 0 && name.indexOf('%') >= 0)
-        mixin(format!("__gshared %s " ~ nameFmt ~ ";")(T.stringof, i));
-    else
-        mixin(format!("__gshared %s " ~ nameFmt ~ ";")(T.stringof));
-        +/
 }
 
 mixin template GlobVar(T, string name="gvar")

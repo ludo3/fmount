@@ -159,10 +159,10 @@ if (isTimeType!T || isDateType!T)
         string isoString = timestamp.toISOString;
         static if (is(T == SysTime))
         {
-            /+
+            /*
             Expected   "20131221T233257.1234560"
             instead of "20131221T233257.123456"
-            +/
+            */
             enum isoLen = "20131221T233257.1234560".length;
             return leftJustify(isoString, isoLen, '0');
         }
@@ -174,10 +174,10 @@ if (isTimeType!T || isDateType!T)
         string extString = timestamp.toISOExtString;
         static if (is(T == SysTime))
         {
-            /+
+            /*
             Expected   "2013-12-21T23:32:57.1234560"
             instead of "2013-12-21T23:32:57.123456"
-            +/
+            */
             enum extLen = "2013-12-21T23:32:57.1234560".length;
             return leftJustify(extString, extLen, '0');
         }
@@ -343,75 +343,6 @@ public:
         }
 
         return result;
-        /+
-        static if (is(TimeType == SysTime))
-        {
-            import core.time : hnsecs, msecs, usecs;
-
-            enum OneSec = DFLT_PRECISION;
-            enum OneMillis = 1.msecs;
-            enum OneMicros = 1.usecs;
-            enum OneHNanos = 1.hnsecs;
-
-            size_t length = thisFormatted.length;
-
-            /*
-            SysTime includes milliseconds, microseconds and hundreds of
-            nanoseconds.
-            */
-            if (precision > OneHNanos)
-            {
-                size_t getLength(alias string secondsTpl,
-                                 alias string millisTpl,
-                                 alias string microsTpl,
-                                 alias string hNanosTpl)()
-                {
-                    string tpl = hNanosTpl;
-
-                    if (precision >= OneSec)
-                        tpl = secondsTpl;
-                    else if (precision >= OneMillis)
-                        tpl = millisTpl;
-                    else if (precision >= OneMicros)
-                        tpl = microsTpl;
-
-                    import dutil.src : dbg;
-                    dbg.ln("Using dateTime template '%s' (%d characters).",
-                           tpl, tpl.length);
-                    return tpl.length;
-                }
-
-                if (format == ISO_DATETIME_FMT)
-                {
-                    // ISOString    looks like 20171231T234759.1234567
-                    enum string HNS_TPL = "yyyymmddTHHMMSS.mmmµµµn";
-                    enum string US_TPL = HNS_TPL[0..$-1];
-                    enum string MS_TPL = US_TPL[0..$-3];
-                    enum string S_TPL = MS_TPL[0..$-3-1]; // -1 for the dot
-
-                    length = getLength!(S_TPL, MS_TPL, US_TPL, HNS_TPL)();
-                }
-                else if (format == EXT_DATETIME_FMT)
-                {
-                    // ISOExtString looks like 2017-12-31T23:47:59.1234567
-                    enum string HNS_TPL = "yyyy-mm-ddTHH:MM:SS.mmmµµµn";
-                    enum string US_TPL = HNS_TPL[0..$-1];
-                    enum string MS_TPL = US_TPL[0..$-3];
-                    enum string S_TPL = MS_TPL[0..$-3-1]; // -1 for the dot
-
-                    length = getLength!(S_TPL, MS_TPL, US_TPL, HNS_TPL)();
-                }
-            }
-
-            import dutil.src : dbg;
-            dbg.ln("Comparing %d characters (%s format) and %s => %s and %s",
-                   length, format,
-                   thisFormatted, formatted,
-                   thisFormatted[0..length], formatted[0..length]);
-
-            return thisFormatted[0..length].cmp(formatted[0..length]);
-        }
-        else+/
     }
 
     import std.traits : isAssignable;

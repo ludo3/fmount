@@ -20,9 +20,9 @@
       "versions" : [
         "FMountApp"
       ],
-      "mainSourceFile" : "src/fmount_app.d",
+      "mainSourceFile" : "src/fmount/fmount_app.d",
       "excludedSourceFiles" : [
-        "src/fumount_app.d"
+        "src/fmount/fumount_app.d"
       ],
       "targetName" : "fmount"
     },
@@ -35,9 +35,9 @@
       "versions" : [
         "FUmountApp"
       ],
-      "mainSourceFile" : "src/fumount_app.d",
+      "mainSourceFile" : "src/fmount/fumount_app.d",
       "excludedSourceFiles" : [
-        "src/fmount_app.d"
+        "src/fmount/fmount_app.d"
       ],
       "targetName" : "fumount"
     }

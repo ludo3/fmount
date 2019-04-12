@@ -14,16 +14,15 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module config;
+module fmount.configbase;
 
 import std.file : exists, isDir, isFile, write;
 import std.path : dirName;
 import std.stdio : writefln;
 import std.string : indexOf;
 
-import appargs : verbose;
 import sdlang : parseFile, parseSource, SDLangException, Tag, Value;
-import ui : tracef, warnf;
+import dutil.ui : tracef, warnf;
 
 
 /**
@@ -129,7 +128,7 @@ class Config
             T[] getValuesImpl(Tag tag)
             {
                 Value[] tagVals = tag.getTagValues(name);
-                if (tagVals != null)
+                if (tagVals)
                 {
                     T[] values;
 
@@ -527,7 +526,7 @@ sub4 sv4="four" {
 // default configuration test: missing configuration file, missing subconfig.
 unittest
 {
-    import osutil : get_dir, jn, removeIfExists;
+    import dutil.os : get_dir, jn, removeIfExists;
     import std.file : deleteme, write;
 
     immutable config_file = jn(get_dir(deleteme), "app.dfltSubCfg.conf");

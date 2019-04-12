@@ -19,28 +19,28 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import appargs :
+import devices.devargs : passphrase_file, passphrase_help;
+import dutil.appargs :
     exec_dir_help, exec_dirs,
     execDirHandler,
     fake, fake_help,
     quiet_help,
     verbose, verbose_help, verboseHandler,
     version_help, version_requested;
-import argsutil : ArgumentException;
+import dutil.run : run_parsed;
 import dutil.typecons : named;
+import fmount.argsutil : ArgumentException;
 import fmount.mnt.mount : fmount;
-import mountargs :
+import fmount.mnt.mountargs :
     atime_help, atimeHandler,
     exec_help, execHandler, noexec_help,
     option_help, options, optionHandler,
-    passphrase_file, passphrase_help,
-    norandom_help, randfileHandler, random_file, random_help, urandom_help,
     read_only_help, read_write_help, readWriteHandler,
     sync_help, async_help, syncHandler,
     type_help, typeHandler,
     umask_help, umaskHandler;
-import run : run_parsed;
-import ui : error, traceStack;
+import dutil.ui : error, traceStack;
+
 
 /**
  * The `fmount` program entry point.
@@ -105,7 +105,6 @@ void doMain(string[] args)
 
             run_parsed(&fmount, progName, args,
                        named("passphrase", passphrase_file),
-                       named("random_file", random_file),
                        named("exec_dirs", exec_dirs),
                        named("options", options),
                        named("verbose", verbose),

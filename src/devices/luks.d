@@ -14,21 +14,47 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module luks;
+module devices.luks;
 
 import core.thread : Thread;
 import core.time : msecs;
 import std.array : join;
-import std.file : exists;
+import std.conv : text;
+import std.file : exists, getSize;
 import std.stdio : writeln;
 import std.string : format;
 import std.traits : hasMember, isSomeString;
 
-import appargs : check_exec_dirs, fake, verbose;
-import constvals : DevMapperDir, VbLevel;
-import dev : dev_path;
-import mountargs : luks_keyfile_args, passphrase_file;
-import osutil : CommandFailedException, jn, runCommand;
+import devices.devargs : passphrase_file;
+import devices.constvals : DevMapperDir;
+import devices.dev : dev_path;
+import dutil.appargs : check_exec_dirs, fake, verbose;
+import dutil.constvals : VbLevel;
+import dutil.os : CommandFailedException, jn, runCommand;
+
+
+/**
+ * Get the --key-file and --keyfile-size arguments for cryptsetup.
+ *
+ * Params:
+ *     password_file = the path to a file containing the password.
+ *
+ * Returns: a string array with `--key-file` and `--keyfile-size` options
+ *          for `cryptsetup luksOpen`.
+ */
+private string[] luks_keyfile_args(const string password_file)
+{
+    if (password_file is null || password_file.length == 0)
+        return [];
+
+    auto pass_size = getSize(password_file);
+
+    const string pass_name = password_file;
+    auto pass_args = [ "--key-file",     pass_name,
+                       "--keyfile-size", text(pass_size) ];
+
+    return pass_args;
+}
 
 
 /**

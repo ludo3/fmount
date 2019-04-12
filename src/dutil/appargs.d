@@ -16,16 +16,17 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module appargs;
+module dutil.appargs;
 
 import std.array : join;
 import std.format : format;
 import std.stdio : stderr;
 
-import constvals : VbLevel;
+import dutil.constvals : VbLevel;
+import dutil.src : unused;
 
 
-private immutable static VbLevel dflt_verbose = VbLevel.Warn;
+private enum VbLevel dflt_verbose = VbLevel.Warn;
 
 /// Tell what is done.
 VbLevel verbose = dflt_verbose;
@@ -102,12 +103,12 @@ string[] exec_dirs = [];
  * The `exec_dirs` public value is updated.
  *
  * Params:
- *     option =    the option short or long name: one of
- *                 `-D`, `--exec-dir`.
+ *     option =    the option short or long name: one of `-D`, `--exec-dir`.
  *     value  =    the option value.
  */
 void execDirHandler(string option, string value)
 {
+    unused(option);
     exec_dirs ~= [ value ];
 }
 
@@ -131,5 +132,7 @@ bool version_requested;
 
 /// Help for rhe version|V option.
 string version_help = "Print the current version number.";
+
+// TODO version number (major, minor, revision, preversion) and string.
 
 

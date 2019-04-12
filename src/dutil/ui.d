@@ -16,23 +16,23 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module ui;
+module dutil.ui;
 
-import std.array : join;
+import unistd = core.sys.linux.unistd;
+import std.algorithm.iteration : filter;
+import std.array : array, join;
 import std.conv : text;
 import std.exception : basicExceptionCtors;
 import std.format : format, formattedWrite;
+import std.getopt : Option;
 import std.range.primitives : ElementType, isInputRange, isOutputRange;
 import std.stdio : stderr, stdout;
 import std.string : fromStringz, toStringz;
 import std.traits : isSomeChar, isSomeString;
-import unistd = core.sys.linux.unistd;
 
-import appargs : verbose;
-import constvals : VbLevel, With;
-import dev : dev_descr, dev_display, is_encrypted;
+import dutil.appargs : verbose;
+import dutil.constvals : VbLevel, With;
 import dutil.src : unused;
-import mountargs : passphrase_file;
 
 version(unittest)
 {
@@ -90,38 +90,32 @@ class PasswordException : Exception
  * Retrieve a password from a file or through a console entry.
  *
  * Params:
- *     dev = The path to a device file.
- *     confirm_for_encryption = to be set to `true` when a password is being
- *                              created, i.e. when encrypting a device.
- *
- *
- *
- *
- *
+ *     reason = why the password is retrieved.
+ *     passphrase_path = The path to a file containing the password.
+ *     confirm_for_creation = to be set to `true` when a password is being
+ *                            created.
  *
  * Returns:
- *     A `File` object, which is a `tempfile.NamedTemporaryFile` if the
- *     `passphrase_file` option is unset.
+ *     A `MaybeTempFile` object, which owns a really temporary file if the
+ *     `reason` is `null` or if .
  *     If the password is not being created and the device is not encrypted then
  *     a `null` reference is returned.
  */
-auto read_password(string dev,
-                   bool confirm_for_encryption=false)
+auto read_password(string reason, string passphrase_path,
+                   bool confirm_for_creation=false)
 {
     import dutil.file : MaybeTempFile;
     import std.stdio : File;
 
-    string descr = dev_descr(dev, dev_display(dev));
-
-    if (confirm_for_encryption || is_encrypted(dev))
+    if (confirm_for_creation || reason)
     {
-        if (passphrase_file)
-            return MaybeTempFile(File(passphrase_file, "r"));
+        if (passphrase_path)
+            return MaybeTempFile(File(passphrase_path, "r"));
         else
         {
             auto pwf = MaybeTempFile("fmount", "", "w+b");
 
-            pwf.write(getpass(descr, confirm_for_encryption));
+            pwf.write(getpass(reason, confirm_for_creation));
             pwf.flush();
 
             return pwf;
@@ -136,36 +130,15 @@ auto read_password(string dev,
  * Display one warning.
  *
  * Params:
- *   minVbLevel = The verbosity level for which the warning is requested.
- *                The message is shown only when `verbose` was set to that
- *                level.
  *   String     = A string type.
  *   message    = A message to be shown.
  */
-void show_warnings(VbLevel minVbLevel, String)(String message)
+void show_warnings(String)(String message)
 if (isSomeString!String ||
     (isInputRange!String &&
      isSomeChar!(ElementType!String)))
 {
-    show_warnings(minVbLevel, [message]);
-}
-
-/**
- * Display one warning.
- *
- * Params:
- *   String     = A string type.
- *   minVbLevel = The verbosity level for which the warning is requested.
- *                The message is shown only when `verbose` was set to that
- *                level.
- *   message    = A message to be shown.
- */
-void show_warnings(String)(VbLevel minVbLevel, String message)
-if (isSomeString!String ||
-    (isInputRange!String &&
-     isSomeChar!(ElementType!String)))
-{
-    show_warnings(minVbLevel, [message]);
+    show_warnings([message]);
 }
 
 
@@ -173,37 +146,15 @@ if (isSomeString!String ||
  * Display one or more warning(s).
  *
  * Params:
- *   minVbLevel = The verbosity level for which the warning is requested.
- *                The message is shown only when `verbose` was set to that
- *                level.
  *   Strings    = An input range of strings.
  *   messages   = Some messages to be shown.
  */
-void show_warnings(VbLevel minVbLevel, Strings)(Strings messages)
+void show_warnings(Strings)(Strings messages)
 if (isInputRange!Strings &&
     (isInputRange!(ElementType!Strings) &&
      isSomeChar!(ElementType!(ElementType!Strings))))
 {
-    show_warnings(minVbLevel, messages);
-}
-
-/**
- * Display one or more warning(s).
- *
- * Params:
- *   Strings    = An input range of strings.
- *   minVbLevel = The verbosity level for which the warning is requested.
- *                The message is shown only when `verbose` was set to that
- *                level.
- *   messages   = Some messages to be shown.
- */
-void show_warnings(Strings)(VbLevel minVbLevel, Strings messages)
-if (isInputRange!Strings &&
-    (isInputRange!(ElementType!Strings) &&
-     isSomeChar!(ElementType!(ElementType!Strings))))
-{
-    if (verbose >= minVbLevel)
-        warn(messages.join("\n"));
+    warn(messages.join("\n"));
 }
 
 
@@ -935,7 +886,7 @@ unittest
     import dutil.src : unused;
     import dutil.trx : bkv;
     import dutil.file : getText;
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     auto stderr0 = bkv(stderr);
     unused(stderr0);
@@ -1003,7 +954,7 @@ unittest
     import dutil.src : unused;
     import dutil.trx : bkv;
     import dutil.file : getText;
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     auto stderr0 = bkv(stderr);
     unused(stderr0);
@@ -1069,7 +1020,7 @@ unittest
 {
     import std.stdio : File;
     import dutil.file : getText;
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     File f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
     scope(exit)
@@ -1127,7 +1078,7 @@ unittest
     import dutil.src : unused;
     import dutil.trx : bkv;
     import dutil.file : getText;
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     auto f = File(deleteme ~ ".stderr." ~ __FUNCTION__, "a+");
     auto w = f.lockingTextWriter();
@@ -1177,4 +1128,63 @@ unittest
     assert(f.getText() == "condition Four args(1);2; 3, Four=4",
            "getText() == " ~ f.getText());
 }
+
+
+/**
+ * Print the parsed options and arguments.
+ * Params:
+ *     Opts    = The types of the program options.
+ *     prog    = The program name.
+ *     args    = The remaining positional arguments.
+ *     options = The program options.
+ */
+void print_args(Opts...)(string prog, string[] args, Opts options)
+{
+    import std.stdio : stderr;
+    output_args!(tracef, stderr, Opts)(prog, args, options);
+}
+
+
+/**
+ * Print the parsed options and arguments to the specified output range.
+ *
+ * Each `Opt` type is expected to have a `name` and a `value` members, like a
+ * `dutil.traits.named` template instance.
+ *
+ * Params:
+ *     Opts   = The types of the program options.
+ *     uifun  = One of the ui `infof`, `tracef`, ... functions.
+ *     output = An output range used to write the options and arguments.
+ *     prog   = The program name.
+ *     args   = The positional arguments.
+ *     options = The program options.
+ */
+void output_args(alias uifun, alias output, Opts...)
+                (string prog, string[] args, Opts options)
+if (is(typeof(output) == typeof(stderr)))
+in
+{
+    static foreach(option; options)
+    {
+        static assert(__traits(compiles, option.name));
+        static assert(__traits(compiles, option.value));
+    }
+}
+do
+{
+    enum fmt = "  %s is '%s'.";
+
+    uifun("%s Options:", output, prog);
+
+    foreach(option; options)
+        uifun(fmt, output, option.name, option.value);
+
+    auto positionalArgs = args
+        .filter!(a => a.length == 0 || a[0] != '-')()
+        .array;
+    if (positionalArgs.length)
+        uifun("Positional arguments:\n    %(%s\n    %)",
+              output, positionalArgs);
+}
+
 

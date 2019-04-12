@@ -16,16 +16,15 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module run;
+module dutil.run;
 
 import std.getopt : GetOptException, GetoptResult, getopt;
 import std.stdio : writeln;
 
-import appargs : check_exec_dirs, verbose;
-import argsutil : print_args;
-import constvals : VbLevel;
+import dutil.appargs : check_exec_dirs, verbose;
+import dutil.constvals : VbLevel;
 import dutil.exceptions : printThChain;
-import ui : info_, error;
+import dutil.ui : info_, error, print_args;
 
 //TODO replace std.getopt with argsd library
 /**

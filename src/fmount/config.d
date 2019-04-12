@@ -16,7 +16,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module appconfig;
+module fmount.config;
 
 import std.array : replace, split;
 import std.exception : enforce;
@@ -28,19 +28,17 @@ import std.stdio : writeln;
 // Dependencies
 import sdlang : Tag, parseFile, parseSource;
 
-import appargs : verbose;
-import config;
-import constvals :
-    ConfFile, SysCfg, UsrCfg,
-    DfltMountRoot, ModePrivateWX, VbLevel;
+import dutil.appargs : verbose;
+import dutil.constvals : ModePrivateWX, VbLevel;
 import dutil.exceptions : printThChain;
-import osutil :
+import fmount.configbase;
+import fmount.constvals : ConfFile, SysCfg, UsrCfg, DfltMountRoot;
+import dutil.os :
     get_dir, getRealUserAndGroup, getRealUserHome,
     isOwnedBy, jn, join_paths;
 
 
 // TODO automatic ssd option for btrfs on encrypted SSD physical devices.
-
 
 /**
  * Retrieve the user configuration file.
@@ -162,6 +160,7 @@ private string replaceVars(string path)
                .replace("${DfltMountRoot}", DfltMountRoot);
 }
 
+
 /**
  * Retrieve the directory at which the directories are created.
  */
@@ -263,7 +262,7 @@ unittest
     import std.file : deleteme, rmdirRecurse, write;
     import std.format : _f = format;
     import dutil.src : srcln, unused;
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     string tmpHome = get_dir(deleteme ~ "/testHome");
     scope(exit)
@@ -616,7 +615,7 @@ unittest
 // Default filesystem configuration test
 unittest
 {
-    import osutil : removeIfExists;
+    import dutil.os : removeIfExists;
 
     auto sysCfg = getSysConfig(getSysCfgFile("fmount.dflt.conf"));
 

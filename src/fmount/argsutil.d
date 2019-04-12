@@ -19,75 +19,11 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module argsutil;
+module fmount.argsutil;
 
-import std.algorithm.iteration : filter;
-import std.array : array;
 import std.format : format;
-import std.getopt : Option;
-import std.range.primitives : isOutputRange;
-import std.stdio : stderr;
-import std.traits : isInstanceOf;
 
-import dutil.typecons : named;
-import ui : tracef;
-
-
-/**
- * Print the parsed options and arguments.
- * Params:
- *     Opts    = The types of the program options.
- *     prog    = The program name.
- *     args    = The remaining positional arguments.
- *     options = The program options.
- */
-void print_args(Opts...)(string prog, string[] args, Opts options)
-{
-    import std.stdio : stderr;
-    output_args!(tracef, stderr, Opts)(prog, args, options);
-}
-
-
-/**
- * Print the parsed options and arguments to the specified output range.
- *
- * Each `Opt` type is expected to be a `named` template instance.
- * Params:
- *     Opts   = The types of the program options.
- *     uifun  = One of the ui `infof`, `tracef`, ... functions.
- *     output = An output range used to write the options and arguments.
- *     prog   = The program name.
- *     args   = The positional arguments.
- *     options = The program options.
- */
-void output_args(alias uifun, alias output, Opts...)(string prog, string[] args,
-                          Opts options)
-if (is(typeof(output) == typeof(stderr)))
-in
-{
-    static foreach(option; options)
-    {
-        static assert(__traits(compiles, option.name));
-        static assert(__traits(compiles, option.value));
-    }
-}
-do
-{
-    enum fmt = "  %s is '%s'.";
-
-    uifun("%s Options:", output, prog);
-
-    foreach(option; options)
-        uifun(fmt, output, option.name, option.value);
-
-    auto positionalArgs = args
-        .filter!(a => a.length == 0 || a[0] != '-')()
-        .array;
-    if (positionalArgs.length)
-        uifun("Positional arguments:\n    %(%s\n    %)",
-              output, positionalArgs);
-}
-
+import dutil.ui : tracef;
 
 
 /// The exception raised when an error is found in program arguments.
@@ -97,18 +33,17 @@ class ArgumentException : Exception
     /// Create an ArgumentException related to a bad number of arguments.
     static ArgumentException badNb(size_t min, size_t max, size_t actual)
     {
-        string fmt;
         string msg;
 
         if (max > min)
         {
-            fmt = "%d arguments, but between %d and %d are expected";
-            msg = fmt.format(actual, min, max);
+            enum fmt = "%d arguments, but between %d and %d are expected";
+            msg = format!fmt(actual, min, max);
         }
         else
         {
-            fmt = "%d arguments instead of %d.";
-            msg = fmt.format(actual, min);
+            enum fmt = "%d arguments instead of %d.";
+            msg = format!fmt(actual, min);
         }
 
         assert(msg !is null);
@@ -146,3 +81,4 @@ class ArgumentException : Exception
     }
 
 }
+

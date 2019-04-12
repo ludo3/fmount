@@ -19,7 +19,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module mnt.mount;
+module fmount.mnt.mount;
 
 import std.algorithm.iteration : filter;
 import std.algorithm.searching : canFind, findAmong, findSplit, startsWith;
@@ -28,20 +28,22 @@ import std.functional : not;
 import std.path : bn=baseName;
 import std.traits : hasMember;
 
-import appconfig : getRoot;
-import appargs : exec_dirs, fake, verbose;
-import constvals : VbLevel;
-import dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
+import devices.dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
              is_encrypted;
-import luks : luksOpen, luksClose;
-import mnt.common : check_user, ensure_mntdir_exists, find_mountpoint,
-                    get_expected_mountpoint, get_fstab_mountpoint,
-                    remove_automatically_created_dir;
-import mountargs : atimes, charset, exec, force_readonly_or_readwrite,
-                   options, passphrase_file,
-                   sync, type, umask;
-import osutil : get_exec_path, runCommand;
-import ui : dbugf, infof, read_password, show_warnings, traceStack, warnf;
+import devices.devargs : passphrase_file;
+import devices.luks : luksOpen, luksClose;
+import dutil.appargs : exec_dirs, fake, verbose;
+import dutil.constvals : VbLevel;
+import fmount.config : getRoot;
+import fmount.mnt.common :
+    check_user, ensure_mntdir_exists, find_mountpoint,
+    get_expected_mountpoint, get_fstab_mountpoint,
+    remove_automatically_created_dir;
+import fmount.mnt.mountargs :
+    atimes, charset, exec, force_readonly_or_readwrite,
+    options, sync, type, umask;
+import dutil.os : get_exec_path, runCommand;
+import dutil.ui : dbugf, infof, read_password, show_warnings, traceStack, warnf;
 
 
 /**
@@ -86,7 +88,11 @@ void fmount(string prog, string[] args) {
     // request a password if needed,
     // put it password into a temporary file,
     // and tell to 'cryptsetyp' to use that password file.
-    auto pwf = read_password(device_path);
+    string description;
+    if (is_encrypted(device_path))
+        description = dev_descr(device_path, dev_display(device_path));
+
+    auto pwf = read_password(description, passphrase_file);
 
     do_mount(mount_prog,
              device_path,
@@ -104,7 +110,6 @@ private void do_mount(F)(string exec_prog,
                          string mountpoint)
 if (is(F == typeof(null)) || hasMember!(F, "name"))
 {
-
     string mp = get_expected_mountpoint(disk, mountpoint);
 
     try
@@ -129,7 +134,7 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
     {
         traceStack(ex);
         string descr = dev_descr(disk, dev_display(disk));
-        show_warnings!(VbLevel.None)(descr ~ ": " ~ ex.message);
+        show_warnings(descr ~ ": " ~ ex.message);
     }
 }
 
@@ -432,7 +437,7 @@ unittest
 unittest
 {
     import std.algorithm.comparison : equal;
-    import constvals : VbLevel;
+    import dutil.constvals : VbLevel;
     import dutil.src : unused;
     import mountargs : dflt_atimes, ForceReadWrite;
 
@@ -608,6 +613,5 @@ private void _do_mount_nocrypt(string exec_prog,
     auto args = [exec_prog] ~ mount_opts ~ [dev_path(disk), mp];
     runCommand(args);
 }
-
 
 

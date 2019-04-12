@@ -19,17 +19,18 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 import std.getopt;
 import std.stdio;
 
-import appargs :
+import dutil.appargs :
     exec_dir_help, exec_dirs,
     execDirHandler,
     fake, fake_help,
     quiet_help,
     verbose, verbose_help, verboseHandler;
-import argsutil : ArgumentException;
+import dutil.run : run_parsed;
 import dutil.typecons : named;
+import fmount.argsutil : ArgumentException;
 import fmount.mnt.umount : fumount;
-import run;
-import ui : error, traceStack;
+import dutil.ui : error, traceStack;
+
 
 /**
  * The `fmount` program entry point.
@@ -91,3 +92,4 @@ private void doMain(string[] args)
         error(goe.msg);
     }
 }
+

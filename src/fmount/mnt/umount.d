@@ -19,18 +19,19 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
    (See accompanying file LICENSE.md or copy at
          http://www.gnu.org/licenses/gpl-3.0.md)
 */
-module mnt.umount;
+module fmount.mnt.umount;
 
 import std.path : bn = baseName;
 
-import appargs : exec_dirs;
-import constvals : VbLevel;
-import dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev, is_encrypted;
-import luks : luksClose;
-import mnt.common : check_user, find_mountpoint, is_in_fstab,
+import devices.dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev, is_encrypted;
+import devices.luks : luksClose;
+import dutil.appargs : exec_dirs;
+import dutil.constvals : VbLevel;
+import fmount.mnt.common : check_user, find_mountpoint, is_in_fstab,
                     remove_automatically_created_dir;
-import osutil : get_exec_path, runCommand;
-import ui : dbugf, info_, infof, show_warnings, traceStack;
+import dutil.os : get_exec_path, runCommand;
+import dutil.ui : dbugf, info_, infof, show_warnings, traceStack;
+
 
 /**
  * Main fumount function.
@@ -99,7 +100,7 @@ private void do_unmount(string exec_prog,
     catch(Exception ex)
     {
         traceStack(ex);
-        show_warnings!(VbLevel.None)(descr ~ ": " ~ ex.toString());
+        show_warnings(descr ~ ": " ~ ex.toString());
     }
 }
 
@@ -120,5 +121,4 @@ private void _do_unmount_nocrypt(string exec_prog,
     runCommand(args);
     remove_automatically_created_dir(mountpoint);
 }
-
 
