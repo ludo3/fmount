@@ -28,7 +28,7 @@ enum MINOR = 0;
 enum PATCH = 0;
 
 /// The version kind: unreleased, alpha, beta, rc (release candidate), release.
-enum VersionKind KIND = VersionKind.unreleased;
+enum VersionKind KIND = VersionKind.dev;
 
 /// The number of iterations for the version kind (alpha1, alpha2, ...) .
 enum KIND_NUM = 0;

@@ -26,6 +26,7 @@ import dutil.appargs :
     quiet_help,
     verbose, verbose_help, verboseHandler,
     version_help, version_requested, versionHandler;
+import dutil.os : program_name;
 import dutil.run : run_parsed;
 import dutil.typecons : named;
 import fmount.argsutil : ArgumentException;
@@ -72,13 +73,12 @@ private void doMain(string[] args)
                                 parsed_args.options);
         }
         else {
-            string progName = args[0];
             args = args[1..$];
 
             if (!version_requested && args.length != 1)
                 throw ArgumentException.badNb(1, 1, args.length);
 
-            run_parsed(ver, &fumount, progName, args,
+            run_parsed(ver, &fumount, program_name, args,
                        named("exec_dirs", exec_dirs),
                        named("verbose", verbose),
                        named("fake", fake));

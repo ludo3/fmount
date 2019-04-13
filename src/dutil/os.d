@@ -19,9 +19,9 @@ module dutil.os;
 import core.stdc.errno : ENOENT, ENOTDIR;
 import std.conv : parse, text, to;
 import std.file : exists, isDir, mkdirRecurse, readText, remove, rmdirRecurse,
-                  setAttributes, FileException;
+                  setAttributes, thisExePath, FileException ;
 import std.format : _f = format;
-import std.path : dirSeparator, expandTilde, pathSeparator;
+import std.path : baseName, dirSeparator, expandTilde, pathSeparator;
 import std.process : environment, execute, executeShell, ProcessException,
                      thisProcessID;
 import std.range.primitives : ElementType, isInputRange;
@@ -34,6 +34,13 @@ import std.uni : isWhite;
 import dutil.appargs : fake;
 import dutil.constvals : ModePrivateRWX, VbLevel;
 import dutil.ui : info_, trace, tracef;
+
+
+/// Retrieve the name part of the program path.
+@property string program_name()
+{
+    return baseName(thisExePath);
+}
 
 
 /**

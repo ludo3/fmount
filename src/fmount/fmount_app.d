@@ -27,6 +27,7 @@ import dutil.appargs :
     quiet_help,
     verbose, verbose_help, verboseHandler,
     version_help, version_requested, versionHandler;
+import dutil.os : program_name;
 import dutil.run : run_parsed;
 import dutil.typecons : named;
 import fmount.appver : ver;
@@ -98,13 +99,12 @@ void doMain(string[] args)
         }
         else
         {
-            string progName = args[0];
             args = args[1..$];
 
             if (!version_requested &&(args.length < 1 || args.length > 2))
                 throw ArgumentException.badNb(1, 2, args.length);
 
-            run_parsed(ver, &fmount, progName, args,
+            run_parsed(ver, &fmount, program_name, args,
                        named("passphrase", passphrase_file),
                        named("exec_dirs", exec_dirs),
                        named("options", options),

@@ -20,6 +20,7 @@ import std.conv : to;
 
 private enum char sep = '.';
 private enum char pre = '-';
+private enum char post = '+';
 
 /// Gather version informations.
 struct Version
@@ -53,17 +54,36 @@ struct Version
   
         if (kind != VersionKind.release)
         {
-            w.put(pre);
-            w.put(kind.to!string);
-
-            if (kind != VersionKind.unreleased)
+            if (kind != VersionKind.dev)
+            {
+                w.put(pre);
+                w.put(kind.to!string);
                 w.put(knum.to!string);
+            }
+            else
+            {
+                w.put(post);
+                w.put(kind.to!string);
+            }
         }
 
         return w.data;
     }
 
 }
+
+/// Create a development (post-release) version.
+Version development(size_t major, size_t minor, size_t patch)
+{
+    return Version(major, minor, patch, VersionKind.dev, 0);
+}
+
+/// Create a release version.
+Version release(size_t major, size_t minor, size_t patch)
+{
+    return Version(major, minor, patch, VersionKind.release, 0);
+}
+
 
 /// Version unittest
 unittest
@@ -72,7 +92,6 @@ unittest
     import std.format : _f = format;
 
     immutable VersionKind[] kinds = [
-        VersionKind.unreleased,
         VersionKind.alpha,
         VersionKind.beta,
         VersionKind.rc
@@ -90,13 +109,17 @@ unittest
                     {
                         immutable ver = Version(maj, min, pat, k, n);
                         immutable exp = _f!"%d.%d.%d-%s%d"(maj, min, pat, k, n);
-                        assert(ver.toString == exp);
+                        assert(ver.to!string == exp, ver.to!string);
                     }
                 }
 
-                immutable ver = Version(maj, min, pat, VersionKind.release, 0);
-                immutable exp = _f!"%d.%d.%d"(maj, min, pat);
-                assert(ver.toString == exp);
+                immutable rel = release(maj, min, pat);
+                immutable relExp = _f!"%d.%d.%d"(maj, min, pat);
+                assert(rel.to!string == relExp, rel.to!string);
+
+                immutable dev = development(maj, min, pat);
+                immutable devExp = _f!"%d.%d.%d+dev"(maj, min, pat);
+                assert(dev.to!string == devExp, dev.to!string);
             }
         }
     }
@@ -106,7 +129,7 @@ unittest
 enum VersionKind : string
 {
     /// Unreleased build, should only be used for test purpose.
-    unreleased = "unreleased",
+    dev = "dev",
 
     /// Alpha version, for early user-level testing.
     alpha = "alpha",
@@ -127,11 +150,11 @@ unittest
 {
     import std.algorithm.comparison : equal;
 
-    assert(equal(VersionKind.unreleased.to!string, "unreleased"));
-    assert(equal(VersionKind.alpha.to!string, "alpha"));
-    assert(equal(VersionKind.beta.to!string, "beta"));
-    assert(equal(VersionKind.rc.to!string, "rc"));
-    assert(equal(VersionKind.release.to!string, "release"));
+    static assert(equal(VersionKind.dev.to!string, "dev"));
+    static assert(equal(VersionKind.alpha.to!string, "alpha"));
+    static assert(equal(VersionKind.beta.to!string, "beta"));
+    static assert(equal(VersionKind.rc.to!string, "rc"));
+    static assert(equal(VersionKind.release.to!string, "release"));
 }
 
 
