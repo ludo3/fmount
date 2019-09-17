@@ -23,7 +23,8 @@ module fmount.mnt.umount;
 
 import std.path : bn = baseName;
 
-import devices.dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev, is_encrypted;
+import devices.dev : dev_descr, dev_display, dev_path, get_dm_and_raw_dev,
+    search_dev_path, is_encrypted;
 import devices.luks : luksClose;
 import dutil.appargs : exec_dirs;
 import dutil.constvals : VbLevel;
@@ -42,7 +43,7 @@ import dutil.ui : dbugf, info_, infof, show_warnings, traceStack;
 void fumount(string prog, string[] args) {
     info_("running fumount");
 
-    immutable string device_path = dev_path(args[0]);
+    immutable string device_path = search_dev_path(args[0]);
 
     enum fumountArgsFmt = `
   %s(device_path=%s);

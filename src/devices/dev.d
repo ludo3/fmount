@@ -20,6 +20,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module devices.dev;
 
 import std.algorithm : filter, map;
+import std.algorithm.searching : startsWith;
 import std.algorithm.sorting : sort;
 import std.array : appender, array;
 import std.conv : text, to;
@@ -128,6 +129,116 @@ private static immutable string[] ALL_DISK_DIRS = [
     DevDir.Label.dup,
     DevDir.PartUuid.dup,
 ];
+
+
+private static immutable string[] ALL_DISK_AND_MAPPER_DIRS = [
+    DevDir.Root.dup,
+    DevDir.Uuid.dup,
+    DevDir.Label.dup,
+    DevDir.PartUuid.dup,
+    DevMapperDir,
+];
+
+
+/**
+ * Retrieve the the device path, i.e. '/dev/sda1'.
+ * If `dev_or_lnk` contains only a file name and no directory separator,
+ * the name is looked up in all usual device directories: `/dev`,
+ * `/dev/disk/by-*`, `/dev/mapper`. If more than one path matches a device name,
+ * then an exception is raised.
+ * Params:
+ *     S           = A string type.
+ *     dev_or_lnk  = A path to a block device, maybe through a symbolic link.
+ */
+S search_dev_path(S)(S dev_or_lnk)
+if (isSomeString!S)
+{
+    S path = dev_or_lnk;
+    S p;
+    if (indexOf(path, dirSeparator[0]) >= 0)
+        return dev_path(dev_or_lnk);
+    else
+    {
+        S[] found_paths;
+
+        // find the name or link name that may match.
+        S name = path;
+        foreach(d; ALL_DISK_AND_MAPPER_DIRS)
+        {
+            p = jn([text(d), name]);
+            if (exists(p))
+            {
+                found_paths ~= p;
+                break;
+            }
+        }
+
+        if (found_paths.length == 1)
+            return dev_path(found_paths[0]);
+        else if (found_paths.length == 0)
+            throw new NoSuchDeviceException("", dev_or_lnk);
+        else
+            throw new TooManyDevicesException("", found_paths);
+    }
+}
+
+
+/**
+ * An exception raised when a device is not found.
+ */
+class NoSuchDeviceException : Exception
+{
+    /// Constructor.
+    this(const string message, const string device)
+    {
+        super(buildDescr(message, device));
+        this._device = device;
+    }
+
+    static private string buildDescr(const string message, const string device)
+    {
+        string msg = message;
+        if (msg !is null && msg.length > 0)
+            msg ~= '\n';
+        msg ~= "No such device: " ~ device;
+        return msg;
+    }
+
+    private const string _device;
+}
+
+
+/**
+ * An exception raised when more than one device match a device name.
+ */
+class TooManyDevicesException : Exception
+{
+    /// Constructor.
+    this(const string message, const string[] devices ...)
+    {
+        super(buildDescr(message, devices));
+        this._devices = devices;
+    }
+
+    static private string buildDescr(const string message,
+                                     const string[] devices)
+    {
+        string msg = message;
+        if (msg is null)
+            msg = "";
+        if (msg.length)
+            msg ~= '\n';
+
+        auto devs = array(devices);
+        string[] descrs = array(map!(d => dev_descr(d))(devs));
+        string devs_msg = join(descrs, ", ");
+        msg ~= format!"Matching devices: %s."(devs_msg);
+
+        return msg;
+    }
+
+    private const string[] _devices;
+}
 
 
 /**
@@ -269,6 +380,19 @@ if (isSomeString!S)
     return _dev_link_name(dev, DevDir.Path);
 }
 
+
+
+/**
+ * Retrieve the device mapper name of the device at /dev/mapper.
+ * Params:
+ *     S   = A string type.
+ *     dev = A path to a block device.
+ */
+S dev_mapper_name(S)(S dev)
+if (isSomeString!S)
+{
+    return _dev_link_name(dev, DevMapperDir);
+}
 
 
 /**
@@ -692,6 +816,12 @@ class MountedDeviceException : Exception
 }
 
 
+private S dm_pfx(S)()
+{
+    S prefix = to!S("_dev_");
+    return prefix;
+}
+
 /**
  * Build a mapping name for encrypted devices.
  *
@@ -704,22 +834,22 @@ class MountedDeviceException : Exception
 S get_dm_name(S)(S raw_device)
 if (isSomeString!S)
 {
-    // Note: pmount uses '_dev_sdXN' as mapping label.
+    // Note: both fmount and pmount use '_dev_sdXN' as mapping label.
     // Example: DM_NAME='_dev_sdc1' for /dev/sdc1 encrypted partition.
-    S prefix = "_dev_";
-    return prefix ~ dev_name(dev_path(raw_device));
+    return dm_pfx!S() ~ dev_name(dev_path(raw_device));
 }
 
 
 /**
- *  Retrieve the dmcrypt device for an encrypted device.
+ *  Retrieve the dmcrypt device for an encrypted device, or the encrypted device
+ *  for a dmcrypt device.
  *
  *  Both the dmcrypt and raw device are returned in a tuple
  *  (decrypted_disk, disk), or the (disk, "") tuple is returned.
  *
  * Params:
  *     S    = A string type.
- *     disk = A path to an encrypted block device.
+ *     disk = A path to an encrypted block device or to a dmcrypt block device.
  */
 S[] get_dm_and_raw_dev(S)(S disk)
 if (isSomeString!S)
@@ -737,6 +867,15 @@ if (isSomeString!S)
                 disk = dm;
                 break;
             }
+        }
+    }
+    else if (is_dm(disk))
+    {
+        immutable S mapper_name = dev_mapper_name(disk);
+        foreach(S raw; dirEntries(DevDir.Root, SpanMode.shallow))
+        {
+            if (get_dm_name(raw) == mapper_name)
+                encrypted_disk = raw;
         }
     }
 

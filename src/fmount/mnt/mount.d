@@ -29,7 +29,7 @@ import std.path : bn=baseName;
 import std.traits : hasMember;
 
 import devices.dev : dev_descr, dev_display, dev_fs, dev_path, get_dm_name,
-             is_encrypted;
+             is_encrypted, search_dev_path;
 import devices.devargs : passphrase_file;
 import devices.luks : luksOpen, luksClose;
 import dutil.appargs : exec_dirs, fake, verbose;
@@ -54,7 +54,7 @@ import dutil.ui : dbugf, infof, read_password, show_warnings, traceStack, warnf;
  */
 void fmount(string prog, string[] args) {
     immutable string requested_device = args[0];
-    immutable string device_path = dev_path(requested_device);
+    immutable string device_path = search_dev_path(requested_device);
     string mountpoint;
 
     if (args.length > 1)
@@ -110,8 +110,6 @@ private void do_mount(F)(string exec_prog,
                          string mountpoint)
 if (is(F == typeof(null)) || hasMember!(F, "name"))
 {
-    string mp = get_expected_mountpoint(disk, mountpoint);
-
     try
     {
         // The next code needs root privileges.
@@ -123,11 +121,11 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
                                   dm_name);
             scope(failure) luksClose(dm_name);
 
-            _do_mount_nocrypt(exec_prog, dmdev, mp);
+            _do_mount_nocrypt(exec_prog, dmdev, mountpoint);
         }
         else
         {
-            _do_mount_nocrypt(exec_prog, disk, mp);
+            _do_mount_nocrypt(exec_prog, disk, mountpoint);
         }
     }
     catch(Exception ex)
@@ -592,7 +590,7 @@ private void _do_mount_nocrypt(string exec_prog,
 
     string[] mount_opts;
     auto fstab_mountpoint = get_fstab_mountpoint(disk);
-    string mp = mountpoint;
+    string mp = get_expected_mountpoint(disk, mountpoint);
 
     if (fstab_mountpoint !is null && fstab_mountpoint.length > 0)
     {

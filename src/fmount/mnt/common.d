@@ -29,7 +29,8 @@ import std.string : format;
 import std.traits : isSomeString;
 
 import devices.dev :
-    dev_path, dev_link_paths, get_dm_and_raw_dev, is_removable, is_usb;
+    dev_path, dev_link_paths, dev_mapper_name, get_dm_and_raw_dev, is_dm,
+    is_removable, is_usb;
 import dutil.appargs : fake, verbose;
 import dutil.constvals : VbLevel;
 import dutil.exceptions : printThChain;
@@ -634,12 +635,45 @@ if (isSomeString!S)
         }
         else
         {
+            if (is_dm(device))
+            {
+                immutable dnr = get_dm_and_raw_dev(device).idup;
+                auto raw = dnr[1];
+
+                if (raw.length > 0)
+                {
+                    if (verbose >= VbLevel.More)
+                    {
+                        removable = is_removable(raw);
+                        usb = is_usb(raw);
+
+                        auto r_or_u = "";
+                        auto op_permitted =
+                            ("dm device %s (%s encrypted device %s): "
+                           ~ "Operation permitted for real_user='%s' as "
+                           ~ "effective_user='root'.");
+                        if (usb)
+                            r_or_u = "usb";
+                        if (removable)
+                        {
+                            if (r_or_u.length > 0)
+                                r_or_u ~= " ";
+                            r_or_u ~= "removable";
+                        }
+                        tracef(op_permitted, device, r_or_u, raw, real_user);
+                    }
+
+                    return;
+                }
+
+            }
             // TODO check configuration : allow or disallow fixed devices
             //                            at system level.
 
             // if the user is really root, only warn about fixed device;
             // otherwise the action is forbidden.
             warn("The device ", device, " is not removable.");
+            warn(get_dm_and_raw_dev(device));
             if (real_user == "root:root")
                 return;
         }
