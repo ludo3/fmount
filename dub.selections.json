@@ -1,6 +1,8 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"dmocks": "2.0.6",
+		"dunit": "1.0.15",
 		"libinputvisitor": "1.2.2",
 		"sdlang-d": "0.10.4",
 		"taggedalgebraic": "0.10.12",
