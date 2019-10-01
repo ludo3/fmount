@@ -7,6 +7,8 @@
   "copyright" : "Copyright © 2018, Ludovic Dordet",
   "license" : "GPL-3.0",
   "dependencies": {
+		"dmocks": "~>2.0.6",
+		"dunit": "~>1.0.14",
 		"sdlang-d": "~>0.10.4"
 	},
 
