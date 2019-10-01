@@ -22,11 +22,23 @@ import std.algorithm.searching : minElement;
 /// The default directory under which mountpoints are created.
 enum string DfltMountRoot = "/media";
 
+/// Tell whether directories must be created.
+enum CreateDirs : bool
+{
+    /// Do not create directories.
+    NO,
+
+    /// Create directories.
+    YES,
+};
 
 /// A structure with root directory, subdirectories and file name.
 struct ConfFile
 {
     import std.path : sep = dirSeparator;
+
+    /// Select automatic directory creation or not.
+    CreateDirs createDirs;
 
     /// The root directory of the configuration file.
     string root;
@@ -45,10 +57,10 @@ struct ConfFile
 }
 
 /// The system configuration root, directory and file name.
-enum ConfFile SysCfg = { "/etc", "fmount", "fmount.conf" };
+enum ConfFile SYS_CFG = { CreateDirs.NO, "/etc", "fmount", "fmount.conf" };
 
 /// The user configuration root, directory and file name.
-enum ConfFile UsrCfg = { "~", ".fmount", "fmountrc" };
+enum ConfFile USR_CFG = { CreateDirs.YES, "~", ".fmount", "fmountrc" };
 
 
 /// The path to the `fstab` file.

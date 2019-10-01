@@ -282,15 +282,17 @@ unittest
         assert(inf0.prettyFuncName == pf);
         assert(inf0.moduleName == m);
 
-        assert(fn == "dutil.src.__unittest_L"~to!string(l-7)~"_C1.testSrcInfo",
+        assert(fn ==
+               "dutil.src.__unittest_L" ~ to!string(l-7) ~ "_C1.testSrcInfo",
                fn);
-        assert(inf0.shortDescription == "@src/dutil/src.d("~ln~"): ",
+        assert(inf0.shortDescription == "@src/dutil/src.d(" ~ ln ~ "): ",
                inf0.shortDescription);
 
         string s = inf0;
         assert(s.equal(inf0.shortDescription));
 
-        assert(inf0.longDescription == "@src/dutil/src.d("~ln~"): "~pf~" ");
+        assert(inf0.longDescription ==
+               "@src/dutil/src.d(" ~ ln ~ "): " ~ pf ~ " ");
         assert(inf0.funcDetails == m ~ " : " ~ pf ~ " (" ~ ln ~ ") ");
 
         assert(inf0.customDescription("") == "");
@@ -417,14 +419,15 @@ unittest
         assert(info.SIGNATURE == pf);
         assert(info.MODULE == m);
 
-        assert(fn == "dutil.src.__unittest_L"~to!string(l-7)~"_C1.testSrcLoc",
+        assert(fn ==
+               "dutil.src.__unittest_L" ~ to!string(l-7) ~ "_C1.testSrcLoc",
                fn);
-        assert(info.SHORT_DESCR == "@src/dutil/src.d("~ln~"): ");
+        assert(info.SHORT_DESCR == "@src/dutil/src.d(" ~ ln ~ "): ");
 
         string s = info;
         assert(s.equal(info.SHORT_DESCR));
 
-        assert(info.LONG_DESCR == "@src/dutil/src.d("~ln~"): "~pf~" ");
+        assert(info.LONG_DESCR == "@src/dutil/src.d(" ~ ln ~ "): " ~ pf ~ " ");
         assert(info.FUNC_DETAILS == m ~ " : " ~ pf ~ " (" ~ ln ~ ") ");
 
         assert(info.customDescr!("") == "");

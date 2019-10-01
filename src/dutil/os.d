@@ -17,6 +17,7 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 module dutil.os;
 
 import core.stdc.errno : ENOENT, ENOTDIR;
+import std.array : replace;
 import std.conv : parse, text, to;
 import std.file : exists, isDir, mkdirRecurse, readText, remove, rmdirRecurse,
                   setAttributes, thisExePath, FileException ;
@@ -73,6 +74,63 @@ string get_exec_path(string name, string[] exec_dirs=[],
 }
 
 
+private immutable static string[] HOME_VARS = [
+    "~",
+    "~$USER",
+    "~${USER}",
+    "~$USERNAME",
+    "~${USERNAME}",
+    "$HOME",
+    "${HOME}",
+];
+
+
+private immutable static string[] USER_VARS = [
+    "$USER",
+    "${USER}",
+    "$USERNAME",
+    "${USERNAME}",
+];
+
+
+/**
+ * Expand the real user's name and/or home in a path, using the real user's
+ * path.
+ * SUDO's SUDO_USER variable, then SUPER's CALLER_HOME then CALLER variable,
+ * then the process ruser variable are used to retrieve the user name and/or
+ * home directory.
+ */
+string expandRealUserPath(string path)
+{
+    string expandedPath = path.dup;
+    string ruser = "";
+    string ruserHome = "";
+
+    ruser = environment.get("SUDO_USER", "");
+    if (ruser.length == 0)
+        ruser = environment.get("CALLER", "");
+
+    if (ruser.length == 0)
+        ruser = getRealUserAndGroup().split(":")[0];
+
+    ruserHome = environment.get("CALLER_HOME", "");
+    if (ruserHome.length == 0)
+        ruserHome = getUserHome(ruser);
+
+    foreach (homeVar; HOME_VARS)
+    {
+        expandedPath = expandedPath.replace(homeVar, ruserHome);
+    }
+
+    foreach (userVar; USER_VARS)
+    {
+        expandedPath = expandedPath.replace(userVar, ruser);
+    }
+
+    return expandedPath;
+}
+
+
 /**
  * Create a directory if needed, and return its path with user and environment
  * variables expanded.
@@ -80,12 +138,14 @@ string get_exec_path(string name, string[] exec_dirs=[],
  * Params:
  *     path = the directory to be created if needed.
  *     mode = the access control list to be applied to the directory on creation
+ *     autoCreate = true if any missing directory must be created.
  */
-string get_dir(string path, ushort mode=ModePrivateRWX)
+string get_dir(string path, ushort mode=ModePrivateRWX, bool autoCreate=false,
+               bool allowMissing=false)
 {
     string expanded_path = path;
     if (indexOf(path, "~") >= 0)
-        expanded_path = expandTilde(path);
+        expanded_path = expandRealUserPath(path);
 
     if (!exists(expanded_path))
     {
@@ -96,9 +156,17 @@ string get_dir(string path, ushort mode=ModePrivateRWX)
 
         if (!fake)
         {
-            mkdirRecurse(expanded_path);
-            auto dir = expanded_path;
-            dir.setAttributes(mode);
+            if (autoCreate)
+            {
+                auto dir = expanded_path;
+                mkdirRecurse(dir);
+                dir.setAttributes(mode);
+            }
+            else if (!allowMissing)
+            {
+                enum string msg = "The directory %s does not exist";
+                throw new FileException(expanded_path, _f!msg(expanded_path));
+            }
         }
     }
     else if (!isDir(expanded_path))
@@ -134,7 +202,7 @@ private string getSomeUserAndGroup(string fmt)
     import std.string : strip;
 
     immutable usergroup =
-        runCommand(_f!"ps --no-headers -n -o%s %d"(fmt, thisProcessID));
+        runCommand(_f!"ps --no-headers -o%s %d"(fmt, thisProcessID));
 
     immutable arr = usergroup.strip.split(spaces).idup;
 
@@ -213,13 +281,18 @@ string getRealUserHome(string realUser)
         {
             //home not transmitted by `sudo`
             string passwdLine = getUserEtcPasswdLine(realUser);
-            home = passwdLine.split(":")[5];
+            home = getUserHome(realUser);
         }
         else
             home = env.get("HOME");
     }
 
     return home;
+}
+
+private string getUserHome(string login)
+{
+    return getUserEtcPasswdLine(login).split(":")[5];
 }
 
 private string getUserEtcPasswdLine(string user)
@@ -241,6 +314,25 @@ private string getUserEtcPasswdLine(string user)
     throw new Exception(_f!"User '%s' not found in %s"(user, PasswdPath));
 }
 
+private string getGidEtcGroupLine(string gid)
+{
+    enum GroupPath = "/etc/group";
+
+    File groupFile = File(GroupPath);
+    string line;
+
+    while ((line = groupFile.readln()) !is null)
+    {
+        string gidInEtcgroup = line.split(":")[2];
+        if (gidInEtcgroup == gid)
+        {
+            return line;
+        }
+    }
+
+    throw new Exception(_f!"GID '%s' not found in %s"(gid, GroupPath));
+}
+
 unittest
 {
     import std.algorithm.iteration : filter;
@@ -250,13 +342,16 @@ unittest
     import std.string : join;
 
     string expectedUser = env.get("USER", "user");
-    string passwdLine = getUserEtcPasswdLine(expectedUser);
 
-    // expectedUserGroup is usually 1000:1000 for a single user environment.
-    string expectedUserGroup = passwdLine.split(":")[2..4].join(":");
+    string expectedGID = env.get("GID", "");
+    if (expectedGID.length == 0)
+        expectedGID = getUserEtcPasswdLine(expectedUser)
+            .split(":")[3];
+    immutable string groupLine = getGidEtcGroupLine(expectedGID);
+    immutable string expectedGroup = groupLine.split(":")[0];
+    string expectedUserGroup = expectedUser ~ ":" ~ expectedGroup;
 
     string actual = getRealUserAndGroup();
-    // FIXME get group through /etc/passwd and /etc/group
     assert(actual == expectedUserGroup,
            _f!"Real user and group '%s' instead of '%s'.\nenv is:%(\n  %s: %)"
            (actual, expectedUserGroup, env.toAA));

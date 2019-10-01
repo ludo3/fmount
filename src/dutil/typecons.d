@@ -125,14 +125,14 @@ do
 
         static foreach(i, Arg; Args)
         {
-            mixin("enum argIndexes"~to!string(i)~
+            mixin("enum argIndexes" ~ to!string(i) ~
                   " = findAll!(data, Arg.spec);");
 
-            static foreach(argIndex; mixin("argIndexes"~to!string(i)))
+            static foreach(argIndex; mixin("argIndexes" ~ to!string(i)))
             {
                 specs[argIndex] = Arg.spec;
             }
-            indexes ~= mixin("argIndexes"~to!string(i));
+            indexes ~= mixin("argIndexes" ~ to!string(i));
         }
 
         auto toTuple(size_t sz)

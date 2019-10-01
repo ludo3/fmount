@@ -22,54 +22,84 @@ import std.array : replace, split;
 import std.exception : enforce;
 import std.file : exists, isDir;
 import std.format : _f = format;
-import std.path : expandTilde;
+import std.path : dirName, expandTilde;
 import std.stdio : writeln;
 
 // Dependencies
 import sdlang : Tag, parseFile, parseSource;
 
 import dutil.appargs : verbose;
-import dutil.constvals : ModePrivateWX, VbLevel;
+import dutil.constvals : ModePrivateRWX, ModePrivateWX, VbLevel;
 import dutil.exceptions : printThChain;
 import fmount.configbase;
-import fmount.constvals : ConfFile, SysCfg, UsrCfg, DfltMountRoot;
+import fmount.constvals : ConfFile, SYS_CFG, USR_CFG, DfltMountRoot;
 import dutil.os :
     get_dir, getRealUserAndGroup, getRealUserHome,
     isOwnedBy, jn, join_paths;
 
+alias dn = dirName;
 
 // TODO automatic ssd option for btrfs on encrypted SSD physical devices.
 
 /**
  * Retrieve the user configuration file.
  */
-private string getUsrCfgFile(string filename = UsrCfg.name)
+private string getUsrCfgFile(string filename = USR_CFG.name)
 {
-    return join_paths(getCfgDir!("usr", UsrCfg), filename);
+    return join_paths(getCfgDir!("usr", USR_CFG), filename);
 }
 
 
 /**
  * Retrieve the system configuration directory.
  */
-private string getSysCfgFile(string filename = SysCfg.name)
+private string getSysCfgFile(string filename = SYS_CFG.name)
 {
-    return join_paths(getCfgDir!("sys", SysCfg), filename);
+    return join_paths(getCfgDir!("sys", SYS_CFG), filename);
 }
+
+
+// Unit tests for getUsrCfgFile and getSysCfgFile.
+unittest
+{
+    import std.file : deleteme;
+
+    immutable string exp6 = deleteme ~ "/sys/fmount/fmount.conf";
+    immutable string exp6Dir = dn(exp6);
+    string dfltSysCfgFile = getSysCfgFile();
+    assert(dfltSysCfgFile !is null);
+    assert(dfltSysCfgFile == exp6, _f!"dfltSysCfgFile is %s"(dfltSysCfgFile));
+    assert(!exists(exp6Dir), _f!"%s SHOULD NOT have been created"(exp6Dir));
+
+    immutable string expU = deleteme ~ "/usr/.fmount/fmountrc";
+    immutable string expUDir = dn(expU);
+    string dfltUsrCfgFile = getUsrCfgFile();
+    assert(dfltUsrCfgFile !is null);
+    assert(dfltUsrCfgFile == expU, _f!"dfltUsrCfgFile is %s"(dfltUsrCfgFile));
+    assert(exists(expUDir), _f!"%s SHOULD have been created"(expUDir));
+    assert(!exists(expU), _f!"%s SHOULD NOT have been created"(expU));
+}
+
 
 private string getCfgDir(string unittestDirName, alias ConfFile cf)()
 {
     string root;
+    bool allowMissingDir;
 
     version(unittest)
     {
         import std.file : deleteme;
         root = join_paths(deleteme, unittestDirName);
+        allowMissingDir = true;
     }
     else
+    {
         root = cf.root;
+    }
+    immutable bool createDirs = cf.createDirs;
 
-    return get_dir(join_paths(root, cf.dirs), ModePrivateWX);
+    return get_dir(join_paths(root, cf.dirs), ModePrivateWX,
+                   createDirs, allowMissingDir);
 }
 
 
@@ -264,7 +294,7 @@ unittest
     import dutil.src : srcln, unused;
     import dutil.os : removeIfExists;
 
-    string tmpHome = get_dir(deleteme ~ "/testHome");
+    string tmpHome = get_dir(deleteme ~ "/testHome", ModePrivateRWX, true);
     scope(exit)
         rmdirRecurse(tmpHome);
 
@@ -291,8 +321,8 @@ unittest
             && bn(path) == "testUser";
     }
 
-    get_dir(tmpHome ~ "/media/testUser");
-    get_dir(tmpHome ~ "/mnt/testUser");
+    get_dir(tmpHome ~ "/media/testUser", ModePrivateRWX, true);
+    get_dir(tmpHome ~ "/mnt/testUser", ModePrivateRWX, true);
     void testRoot(string testName,
                   string file=__FILE__, size_t line=__LINE__)
                  (string userCfgContent,
@@ -464,10 +494,10 @@ unittest
                   allow_root "/media" "${home}/mnt" "/media/${user}"`,
              tmpHome ~ "/mnt");
 
-    get_dir(tmpHome ~ "/media/testGrp");
-    get_dir(tmpHome ~ "/media/testUser");
-    get_dir(tmpHome ~ "/mnt/testUser");
-    get_dir(tmpHome ~ "/mnt/testGrp");
+    get_dir(tmpHome ~ "/media/testGrp", ModePrivateRWX, true);
+    get_dir(tmpHome ~ "/media/testUser", ModePrivateRWX, true);
+    get_dir(tmpHome ~ "/mnt/testUser", ModePrivateRWX, true);
+    get_dir(tmpHome ~ "/mnt/testGrp", ModePrivateRWX, true);
     testRoot!("admin home media group")
             (`
                   # root "/mnt"`,

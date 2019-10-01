@@ -24,7 +24,8 @@ import std.algorithm.searching : startsWith;
 import std.algorithm.sorting : sort;
 import std.array : appender, array;
 import std.conv : text, to;
-import std.file : dirEntries, exists, isSymlink, readLink, readText, SpanMode;
+import std.file : dirEntries, exists, isDir, isSymlink,
+                  readLink, readText, SpanMode;
 import std.path : absolutePath, baseName, buildNormalizedPath, dirName,
                   dirSeparator, isAbsolute;
 import std.stdio : writeln;
@@ -316,7 +317,7 @@ if (isSomeString!S)
 {
     immutable S name = dev_name(dev);
 
-    if (exists(link_dir))
+    if (exists(link_dir) && isDir(link_dir))
     {
         foreach (S link; dirEntries(link_dir, SpanMode.shallow))
         {
@@ -479,13 +480,16 @@ if (isSomeString!S)
         if (endsWith(d, dirSeparator))
             d = d[0..$-1];
 
-        auto files = dirEntries(d, SpanMode.shallow).array;
+        if (exists(d) && isDir(d))
+        {
+            auto files = dirEntries(d, SpanMode.shallow).array;
 
-        auto lnks = files
-            .filter!(f => isSymlink(f.name)
-                          && path == absolutePath(buildNormalizedPath(jn(d, readLink(f.name)))))
-            .array;
-        linksCat ~= lnks;
+            auto lnks = files
+                .filter!(f => isSymlink(f.name)
+                    && path == absolutePath(buildNormalizedPath(jn(d, readLink(f.name)))))
+                .array;
+            linksCat ~= lnks;
+        }
     }
 
     return linksCat.data;
@@ -642,14 +646,20 @@ if (isSomeString!S)
     immutable S part_name = dev_name(dev);
     immutable S sysroot = "/sys/block";
 
-    foreach (S sysdir; dirEntries(sysroot, SpanMode.shallow))
+    if (exists(sysroot) && isDir(sysroot))
     {
-        foreach (S part; dirEntries(sysdir, SpanMode.shallow))
+        foreach (S sysdir; dirEntries(sysroot, SpanMode.shallow))
         {
-            if (bn(part) == part_name)
+            if (exists(sysdir) && isDir(sysdir))
             {
-                // /sys/block/sdb/sdb1 => sdb
-                return to!S(bn(sysdir));
+                foreach (S part; dirEntries(sysdir, SpanMode.shallow))
+                {
+                    if (bn(part) == part_name)
+                    {
+                        // /sys/block/sdb/sdb1 => sdb
+                        return to!S(bn(sysdir));
+                    }
+                }
             }
         }
     }
@@ -712,14 +722,17 @@ if (isSomeString!S)
 
     bool ret;
 
-    foreach (S lnk; dirEntries(DevMapperDir, SpanMode.shallow))
+    if (exists(DevMapperDir) && isDir(DevMapperDir))
     {
-        if (isSymlink(lnk))
+        foreach (S lnk; dirEntries(DevMapperDir, SpanMode.shallow))
         {
-            if (bn(readLink(lnk)) == name)
+            if (isSymlink(lnk))
             {
-                ret = true;
-                break;
+                if (bn(readLink(lnk)) == name)
+                {
+                    ret = true;
+                    break;
+                }
             }
         }
     }
@@ -859,23 +872,29 @@ if (isSomeString!S)
     if (is_encrypted(disk))
     {
         immutable S dm_name = get_dm_name(disk);
-        foreach(S dm; dirEntries(DevMapperDir, SpanMode.shallow))
+        if (exists(DevMapperDir) && isDir(DevMapperDir))
         {
-            if (bn(dm) == dm_name)
+            foreach(S dm; dirEntries(DevMapperDir, SpanMode.shallow))
             {
-                encrypted_disk = disk;
-                disk = dm;
-                break;
+                if (bn(dm) == dm_name)
+                {
+                    encrypted_disk = disk;
+                    disk = dm;
+                    break;
+                }
             }
         }
     }
     else if (is_dm(disk))
     {
         immutable S mapper_name = dev_mapper_name(disk);
-        foreach(S raw; dirEntries(DevDir.Root, SpanMode.shallow))
+        if (exists(DevDir.Root) && isDir(DevDir.Root))
         {
-            if (get_dm_name(raw) == mapper_name)
-                encrypted_disk = raw;
+            foreach(S raw; dirEntries(DevDir.Root, SpanMode.shallow))
+            {
+                if (get_dm_name(raw) == mapper_name)
+                    encrypted_disk = raw;
+            }
         }
     }
 

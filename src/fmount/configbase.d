@@ -22,6 +22,7 @@ import std.stdio : writefln;
 import std.string : indexOf;
 
 import sdlang : parseFile, parseSource, SDLangException, Tag, Value;
+import dutil.constvals : ModePrivateRWX;
 import dutil.ui : tracef, warnf;
 
 
@@ -529,7 +530,8 @@ unittest
     import dutil.os : get_dir, jn, removeIfExists;
     import std.file : deleteme, write;
 
-    immutable config_file = jn(get_dir(deleteme), "app.dfltSubCfg.conf");
+    immutable config_file = jn(get_dir(deleteme, ModePrivateRWX, true),
+                               "app.dfltSubCfg.conf");
     auto cfg = new Config();
 
     enum DFLT_CONFIG = `
