@@ -387,8 +387,7 @@ template vbFuns(VbLevel vl)
     void vbImpl(WithPrefix prefix=WithPrefix.Yes,
                 string file=__FILE__, size_t line=__LINE__,
                 A...)(lazy A args)
-    if (args.length > 0 && !is(A[0] == bool) && !is(A[0] == File) &&
-        !isOutRChar!(A[0]))
+    if (args.length > 0 && !is(A[0] == bool) && !is(A[0] == File))
     {
         if (verbose >= vl)
         {
