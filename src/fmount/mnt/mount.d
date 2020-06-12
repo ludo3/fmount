@@ -139,7 +139,7 @@ if (is(F == typeof(null)) || hasMember!(F, "name"))
 
 private immutable static string[][string] overriden_options;
 
-static this()
+shared static this()
 {
     immutable string[][string] opts = [
         "async": ["sync"],

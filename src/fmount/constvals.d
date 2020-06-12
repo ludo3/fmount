@@ -89,7 +89,7 @@ immutable long[string] MAX_FS_LABEL_LENGTHS;
  */
 static immutable long MinMaxFsLabelLength;
 
-static this()
+shared static this()
 {
     import std.exception : assumeUnique;
 

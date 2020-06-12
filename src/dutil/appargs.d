@@ -31,7 +31,7 @@ private enum VbLevel dflt_verbose = VbLevel.Warn;
 /// Tell what is done.
 VbLevel verbose = dflt_verbose;
 
-static this()
+shared static this()
 {
     version(unittest)
     verbose = VbLevel.Info;

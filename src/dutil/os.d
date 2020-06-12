@@ -239,7 +239,7 @@ string getEffectiveUserAndGroup()
 
 private string _realUserAndGroup;
 
-static this()
+shared static this()
 {
     _realUserAndGroup = getSomeUserAndGroup("ruser,rgroup");
 }
