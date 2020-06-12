@@ -30,7 +30,7 @@ enum CreateDirs : bool
 
     /// Create directories.
     YES,
-};
+}
 
 /// A structure with root directory, subdirectories and file name.
 struct ConfFile
