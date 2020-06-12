@@ -16,6 +16,8 @@ Distributed under the GNU GENERAL PUBLIC LICENSE, Version 3.0.
 */
 module dutil.trx;
 
+import std.traits : Unqual;
+
 version(unittest)
 {
     import std.conv : to;
@@ -71,6 +73,15 @@ public:
         doRollback();
     }
 
+    /**
+    Assignment operator.
+
+    Params:
+        value = new value to be used
+
+    Returns: A reference to the modified object.
+
+    */
     ref T opAssign(this T, X)(auto ref X value)
     if (isAssignable!(V, X))
     {
@@ -79,7 +90,7 @@ public:
     }
 
     /// Retrieve the initial value.
-    @property ref V initial() { return _init; }
+    @property Unqual!V initial() const { return cast(Unqual!V)(_init); }
 
     /// Retrieve the current value.
     @property ref V current() { return *_valueAddr; }
@@ -100,9 +111,9 @@ private:
     @property bool done() { return _done; }
     @property void done(bool b) { _done = b; }
 
-    void doRelease() { if (!done) initial = *_valueAddr; done = true; }
+    void doRelease() { if (!done) _init = *_valueAddr; done = true; }
 
-    void doRollback() { if (!done) doAssign(initial); done = true; }
+    void doRollback() { if (!done) doAssign(_init); done = true; }
 
     void doAssign(X)(auto ref X value)
     if (isAssignable!(V, X))
